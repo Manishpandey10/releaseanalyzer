@@ -167,6 +167,7 @@ export async function updateRelease(id: string, input: UpdateReleaseInput) {
             data: { isStale: true }
           });
         }
+        await tx.statementEvidence.deleteMany({ where: { releaseItemId: { in: toDelete } } });
         await tx.releaseItem.deleteMany({ where: { id: { in: toDelete } } });
       }
     }

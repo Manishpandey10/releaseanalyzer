@@ -145,8 +145,12 @@ export interface AiAnalysis {
   updatedAt: string;
 }
 
-export async function analyzeRelease(id: string): Promise<AiAnalysis> {
-  const res = await fetch(`${API_BASE}/releases/${id}/analyze`, { method: "POST" });
+export async function analyzeRelease(id: string, force = false): Promise<AiAnalysis> {
+  const res = await fetch(`${API_BASE}/releases/${id}/analyze`, { 
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ force })
+  });
   return handleResponse<AiAnalysis>(res);
 }
 

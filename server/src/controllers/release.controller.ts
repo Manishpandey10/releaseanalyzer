@@ -87,9 +87,10 @@ export async function validateRelease(req: Request, res: Response, next: NextFun
 export async function analyzeRelease(req: Request, res: Response, next: NextFunction) {
   try {
     const { id } = req.params;
+    const force = req.body?.force === true;
     // We import dynamically or top level, let's use dynamic import here to avoid circular dependencies just in case, or add to top.
     const aiService = await import("../services/ai.service.js");
-    const result = await aiService.analyzeRelease(id!);
+    const result = await aiService.analyzeRelease(id!, force);
     res.json(successResponse(result));
     } catch (err: any) {
     if (err.status === 409) {

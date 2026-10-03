@@ -382,6 +382,7 @@ describe("Staleness Edge Cases and Resolution", () => {
     await request(app).post(`/api/releases/${releaseId}/statements/${stmt2Id}/approve`);
 
     const finRes = await request(app).post(`/api/releases/${releaseId}/finalize`);
+    if (finRes.status !== 200) console.log("Finalize failed:", finRes.body);
     expect(finRes.status).toBe(200);
   });
 
@@ -412,7 +413,7 @@ describe("Staleness Edge Cases and Resolution", () => {
     // Change item in tId
     await request(app).patch(`/api/releases/${tId}`).send({ items: [{ itemType: "FEATURE", title: "F", content: "changed" }] });
     
-    const compRes = await request(app).get(`/api/releases/${bId}/compare?targetId=${tId}`);
+    const compRes = await request(app).get(`/api/releases/${bId}/compare/${tId}`);
     expect(compRes.body.data.staleStatements.length).toBe(1);
     expect(compRes.body.data.staleStatements[0].reasons[0].reason).toBe("CHANGED");
   });

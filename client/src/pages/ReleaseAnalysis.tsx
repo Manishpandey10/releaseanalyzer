@@ -55,15 +55,21 @@ export default function ReleaseAnalysis() {
   const hasQA = release?.items?.some((i) => i.itemType === "QA_EVIDENCE") ?? false;
   const canAnalyze = hasChanges && hasQA;
 
-  const handleAnalyze = async () => {
+  const handleAnalyze = async (force = false) => {
     if (!id || !canAnalyze) return;
     setAnalyzing(true);
     setError(null);
     try {
-      const an = await analyzeRelease(id);
+      const an = await analyzeRelease(id, force);
       setAnalysis(an);
     } catch (err: any) {
-      if (err.message.includes("409")) {
+      if (err.message.includes("Re-analysis would replace reviewed statements")) {
+        const confirm = window.confirm("Reviewed statements will be replaced. Are you sure you want to proceed?");
+        if (confirm) {
+          handleAnalyze(true);
+          return;
+        }
+      } else if (err.message.includes("409")) {
         setError("Analysis is already running.");
       } else {
         setError(err instanceof Error ? err.message : "Analysis failed");

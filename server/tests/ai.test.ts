@@ -13,7 +13,12 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await prisma.release.deleteMany({
-    where: { title: { startsWith: "TEST-" } }
+    where: { 
+      OR: [
+        { title: { startsWith: "TEST- Parallel Test" } },
+        { title: { startsWith: "TEST- Sweep Test" } }
+      ]
+    }
   });
   await prisma.$disconnect();
 });
