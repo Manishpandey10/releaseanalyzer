@@ -20,5 +20,6 @@ router.get("/:id/statements", statementController.getStatements);
 router.patch("/:id/statements/:statementId", statementController.updateStatement);
 router.post("/:id/statements/:statementId/approve", statementController.approveStatement);
 router.post("/:id/statements/:statementId/reject", statementController.rejectStatement);
+router.post("/:id/statements/:statementId/resolve", statementController.resolveStatement);
 
 export default router;

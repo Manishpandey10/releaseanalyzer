@@ -108,6 +108,34 @@ export default function CompareRelease() {
             <p className="text-surface-500 text-sm">No items were changed between these versions.</p>
           )}
         </div>
+
+        {comparison.staleStatements.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-lg font-medium text-amber-400 mb-4">Stale Statements</h2>
+            {comparison.staleStatements.map((stmt, i) => (
+              <div key={i} className="bg-amber-500/10 border border-amber-500/30 rounded-xl overflow-hidden p-4">
+                <p className="text-surface-300 text-sm mb-3">"{stmt.text}"</p>
+                
+                <div className="space-y-2">
+                  <span className="text-xs text-amber-400 uppercase font-semibold block mb-1">Reasons for Staleness:</span>
+                  {stmt.reasons.map((r, ri) => (
+                    <div key={ri} className="flex items-center gap-2 text-sm bg-surface-900/50 p-2 rounded-lg border border-surface-800">
+                      <span className="font-mono text-surface-300">[{r.displayId}]</span>
+                      <span className="text-amber-400 font-semibold">{r.reason}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-amber-500/20 flex justify-between items-center">
+                  <span className="text-xs text-surface-400">Review Status: <span className="text-white font-medium">{stmt.reviewStatus}</span></span>
+                  <Link to={`/releases/${otherId}/review`} className="text-xs text-primary-400 hover:text-primary-300 font-medium">
+                    Go to Review →
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );

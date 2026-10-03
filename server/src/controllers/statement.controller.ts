@@ -12,7 +12,11 @@ export async function approveStatement(req: Request, res: Response, next: NextFu
       return;
     }
     res.json(successResponse(stmt));
-  } catch (err) {
+  } catch (err: any) {
+    if (err.status) {
+      res.status(err.status).json(errorResponse("CONFLICT", err.message));
+      return;
+    }
     next(err);
   }
 }
@@ -61,6 +65,31 @@ export async function getStatements(req: Request, res: Response, next: NextFunct
     const statements = await statementService.getStatementsByRelease(id!);
     res.json(successResponse(statements));
   } catch (err) {
+    next(err);
+  }
+}
+
+export async function resolveStatement(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id, statementId } = req.params;
+    const { note } = req.body;
+    
+    if (typeof note !== "string" || note.length < 5) {
+      res.status(400).json(errorResponse("VALIDATION_ERROR", "Note must be at least 5 characters"));
+      return;
+    }
+
+    const stmt = await statementService.resolveStatement(id!, statementId!, note);
+    if (!stmt) {
+      res.status(404).json(errorResponse("NOT_FOUND", "Statement not found"));
+      return;
+    }
+    res.json(successResponse(stmt));
+  } catch (err: any) {
+    if (err.status) {
+      res.status(err.status).json(errorResponse("CONFLICT", err.message));
+      return;
+    }
     next(err);
   }
 }

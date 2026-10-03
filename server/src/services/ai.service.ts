@@ -162,6 +162,10 @@ export async function analyzeRelease(releaseId: string) {
       ];
 
       for (const st of statementData) {
+        const validItems = st.evidenceIds
+          .map((id: string) => release.items.find(i => i.displayId === id))
+          .filter(Boolean) as any[];
+
         const createdStmt = await tx.generatedStatement.create({
           data: {
             releaseId,
@@ -171,6 +175,8 @@ export async function analyzeRelease(releaseId: string) {
             supportStatus: st.supportStatus as SupportStatus,
             reviewStatus: "PENDING",
             isStale: false,
+            originalEvidenceCount: validItems.length,
+            originalEvidenceDisplayIds: validItems.map(i => i.displayId),
           }
         });
 

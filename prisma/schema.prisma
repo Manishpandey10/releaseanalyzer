@@ -121,6 +121,10 @@ model GeneratedStatement {
   supportStatus SupportStatus @default(UNSUPPORTED)
   reviewStatus  ReviewStatus  @default(PENDING)
   isStale       Boolean       @default(false)
+  staleResolutionNote String?
+  staleResolvedAt     DateTime?
+  originalEvidenceCount Int       @default(0)
+  originalEvidenceDisplayIds String[] @default([])
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 

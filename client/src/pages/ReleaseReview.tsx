@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { fetchRelease, fetchStatements, updateStatementContent, approveStatement, rejectStatement, type Release, type Statement } from "../api";
+import { fetchRelease, fetchStatements, updateStatementContent, approveStatement, rejectStatement, resolveStatement, type Release, type Statement } from "../api";
 
 const IMPACT_COLORS: Record<string, string> = {
   LOW: "text-emerald-400 border-emerald-500/30",
@@ -29,6 +29,8 @@ export default function ReleaseReview() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [resolveNote, setResolveNote] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -69,6 +71,17 @@ export default function ReleaseReview() {
       setEditingId(null);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to update");
+    }
+  };
+
+  const handleResolve = async (stmtId: string) => {
+    if (!id) return;
+    try {
+      const updated = await resolveStatement(id, stmtId, resolveNote);
+      setStatements(prev => prev.map(s => s.id === stmtId ? { ...s, ...updated } : s));
+      setResolvingId(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to resolve statement");
     }
   };
 
@@ -149,17 +162,62 @@ export default function ReleaseReview() {
               ))}
             </div>
 
+            {/* Stale Reasons */}
+            {stmt.isStale && stmt.reasons && stmt.reasons.length > 0 && (
+              <div className="mt-4 bg-orange-500/10 border border-orange-500/20 rounded-lg p-3">
+                <span className="text-xs text-orange-400 font-semibold mb-2 block">Staleness Reasons:</span>
+                <div className="space-y-1">
+                  {stmt.reasons.map((r, i) => (
+                    <div key={i} className="flex gap-2 text-xs">
+                      <span className="font-mono text-surface-400">[{r.displayId}]</span>
+                      <span className="text-orange-300">{r.reason}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Resolve Form */}
+            {resolvingId === stmt.id && (
+              <div className="mt-4 p-3 bg-surface-950 border border-surface-700 rounded-lg">
+                <label className="text-xs text-surface-400 mb-1 block">Resolution Note (min 5 chars)</label>
+                <textarea
+                  className="w-full bg-surface-900 border border-surface-700 rounded p-2 text-sm text-white focus:ring-1 focus:ring-primary-500 outline-none mb-2"
+                  rows={2}
+                  value={resolveNote}
+                  onChange={(e) => setResolveNote(e.target.value)}
+                />
+                <div className="flex gap-2">
+                  <button onClick={() => handleResolve(stmt.id)} className="px-3 py-1 bg-orange-600 hover:bg-orange-500 text-white rounded text-xs">Submit</button>
+                  <button onClick={() => setResolvingId(null)} className="px-3 py-1 bg-surface-800 hover:bg-surface-700 text-white rounded text-xs">Cancel</button>
+                </div>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="mt-5 pt-4 border-t border-surface-800/50 flex items-center justify-between">
-              <button
-                onClick={() => {
-                  setEditingId(stmt.id);
-                  setEditContent(stmt.statement);
-                }}
-                className="text-xs text-surface-400 hover:text-white transition-colors"
-              >
-                Edit Content
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setEditingId(stmt.id);
+                    setEditContent(stmt.statement);
+                  }}
+                  className="text-xs text-surface-400 hover:text-white transition-colors"
+                >
+                  Edit Content
+                </button>
+                {stmt.isStale && (
+                  <button
+                    onClick={() => {
+                      setResolvingId(stmt.id);
+                      setResolveNote("");
+                    }}
+                    className="text-xs text-orange-400 hover:text-orange-300 transition-colors"
+                  >
+                    Resolve
+                  </button>
+                )}
+              </div>
               
               <div className="flex items-center gap-2">
                 <button
@@ -171,7 +229,8 @@ export default function ReleaseReview() {
                 </button>
                 <button
                   onClick={() => handleApprove(stmt.id)}
-                  disabled={stmt.reviewStatus === "APPROVED"}
+                  disabled={stmt.reviewStatus === "APPROVED" || stmt.isStale}
+                  title={stmt.isStale ? "Cannot approve a stale statement" : ""}
                   className="px-3 py-1.5 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30 rounded text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Approve

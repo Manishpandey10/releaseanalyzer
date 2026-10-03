@@ -247,3 +247,183 @@ describe("GET /api/releases/:id", () => {
     expect(res.body.data.version).toBe("2.0.0");
   });
 });
+
+describe("Staleness Edge Cases and Resolution", () => {
+  let releaseId: string;
+  let stmt1Id: string;
+  let stmt2Id: string;
+  let stmtUnrelatedId: string;
+
+  beforeAll(async () => {
+    // 1. Create Release
+    const createRes = await request(app).post("/api/releases").send({
+      version: "1.0.0",
+      title: "TEST- Stale Split " + Date.now() + Math.random(),
+      items: [
+        { itemType: "FEATURE", title: "Item 1", content: "Original 1" },
+        { itemType: "BUG_FIX", title: "Item 2", content: "Original 2" },
+        { itemType: "BEHAVIOR_CHANGE", title: "Item 3", content: "Original 3" }
+      ]
+    });
+    releaseId = createRes.body.data.id;
+    const items = createRes.body.data.items;
+
+    // 2. Insert statements manually
+    const stmt1 = await prisma.generatedStatement.create({
+      data: {
+        releaseId, audience: "INTERNAL", statement: "Refers to Item 1", impact: "LOW", supportStatus: "SUPPORTED", reviewStatus: "PENDING", isStale: false,
+        originalEvidenceCount: 1, originalEvidenceDisplayIds: [items[0].displayId],
+        evidence: { create: [{ releaseItemId: items[0].id, sourceHashAtGeneration: items[0].contentHash }] }
+      }
+    });
+    stmt1Id = stmt1.id;
+
+    const stmt2 = await prisma.generatedStatement.create({
+      data: {
+        releaseId, audience: "INTERNAL", statement: "Refers to Item 2", impact: "LOW", supportStatus: "SUPPORTED", reviewStatus: "PENDING", isStale: false,
+        originalEvidenceCount: 1, originalEvidenceDisplayIds: [items[1].displayId],
+        evidence: { create: [{ releaseItemId: items[1].id, sourceHashAtGeneration: items[1].contentHash }] }
+      }
+    });
+    stmt2Id = stmt2.id;
+
+    const stmt3 = await prisma.generatedStatement.create({
+      data: {
+        releaseId, audience: "INTERNAL", statement: "Refers to Item 3", impact: "LOW", supportStatus: "SUPPORTED", reviewStatus: "PENDING", isStale: false,
+        originalEvidenceCount: 1, originalEvidenceDisplayIds: [items[2].displayId],
+        evidence: { create: [{ releaseItemId: items[2].id, sourceHashAtGeneration: items[2].contentHash }] }
+      }
+    });
+    stmtUnrelatedId = stmt3.id;
+  });
+
+  it("changing a cited item makes the statement stale, but unrelated item does not", async () => {
+    // Update Item 1 to make stmt1 stale, and Item 3 to make stmtUnrelated stale. Leave Item 2 alone.
+    // Wait, the prompt says "removing a cited item makes it stale...". 
+    // Let's change Item 1, remove Item 2, keep Item 3 same.
+    const patchRes = await request(app).patch(`/api/releases/${releaseId}`).send({
+      items: [
+        { itemType: "FEATURE", title: "Item 1", content: "Changed 1" },
+        // Item 2 omitted (removed)
+        { itemType: "BEHAVIOR_CHANGE", title: "Item 3", content: "Original 3" }
+      ]
+    });
+    expect(patchRes.status).toBe(200);
+
+    const stmts = await request(app).get(`/api/releases/${releaseId}/statements`);
+    const s1 = stmts.body.data.find((s: any) => s.id === stmt1Id);
+    const s2 = stmts.body.data.find((s: any) => s.id === stmt2Id);
+    const s3 = stmts.body.data.find((s: any) => s.id === stmtUnrelatedId);
+
+    expect(s1.isStale).toBe(true);
+    expect(s1.reasons[0].reason).toBe("CHANGED");
+
+    expect(s3.isStale).toBe(false); // unrelated item not changed
+  });
+
+  it("removing a cited item makes it stale with REMOVED reason naming the item", async () => {
+    const stmts = await request(app).get(`/api/releases/${releaseId}/statements`);
+    const s2 = stmts.body.data.find((s: any) => s.id === stmt2Id);
+    expect(s2.isStale).toBe(true);
+    expect(s2.reasons[0].reason).toBe("REMOVED");
+    expect(s2.reasons[0].displayId).not.toBe("Unknown");
+  });
+
+  it("approving a stale statement -> 409", async () => {
+    const approveFail = await request(app).post(`/api/releases/${releaseId}/statements/${stmt1Id}/approve`);
+    expect(approveFail.status).toBe(409);
+  });
+
+  it("resolve without note / short note -> 400", async () => {
+    const res = await request(app).post(`/api/releases/${releaseId}/statements/${stmt1Id}/resolve`).send({ note: "ok" });
+    expect(res.status).toBe(400);
+  });
+
+  it("resolve refreshes hashes, sets PENDING and isStale=false", async () => {
+    const resolveRes = await request(app).post(`/api/releases/${releaseId}/statements/${stmt1Id}/resolve`).send({ note: "Resolved note" });
+    expect(resolveRes.status).toBe(200);
+    expect(resolveRes.body.data.isStale).toBe(false);
+    expect(resolveRes.body.data.reviewStatus).toBe("PENDING");
+  });
+
+  it("resolved statement can then be approved", async () => {
+    const approveRes = await request(app).post(`/api/releases/${releaseId}/statements/${stmt1Id}/approve`);
+    expect(approveRes.status).toBe(200);
+    expect(approveRes.body.data.reviewStatus).toBe("APPROVED");
+  });
+
+  it("resolve when a cited item was removed -> 409", async () => {
+    const resolveFail = await request(app).post(`/api/releases/${releaseId}/statements/${stmt2Id}/resolve`).send({ note: "Resolved note" });
+    expect(resolveFail.status).toBe(409);
+  });
+
+  it("editing a stale statement clears stale and sets PENDING", async () => {
+    const editRes = await request(app).patch(`/api/releases/${releaseId}/statements/${stmt2Id}`).send({ statement: "Edited statement" });
+    expect(editRes.status).toBe(200);
+    expect(editRes.body.data.isStale).toBe(false);
+    expect(editRes.body.data.reviewStatus).toBe("PENDING");
+  });
+
+  it("rejected stale statement does not block finalize", async () => {
+    // Approve stmt3 to be safe
+    await request(app).post(`/api/releases/${releaseId}/statements/${stmtUnrelatedId}/approve`);
+    
+    // We reject a stale statement by changing a new one
+    const stmt4 = await prisma.generatedStatement.create({
+      data: {
+        releaseId, audience: "INTERNAL", statement: "To be rejected", impact: "LOW", supportStatus: "SUPPORTED", reviewStatus: "PENDING", isStale: true, originalEvidenceCount: 1, originalEvidenceDisplayIds: []
+      }
+    });
+    
+    await request(app).post(`/api/releases/${releaseId}/statements/${stmt4.id}/reject`);
+    
+    // Attempt finalize (should pass if no other pendings/stale approved exist)
+    // Wait, stmt2 is PENDING right now after the edit. Let's approve it.
+    await request(app).post(`/api/releases/${releaseId}/statements/${stmt2Id}/approve`);
+
+    const finRes = await request(app).post(`/api/releases/${releaseId}/finalize`);
+    expect(finRes.status).toBe(200);
+  });
+
+  it("finalize blocked while a stale approved statement exists", async () => {
+    // Create new release to test blocked finalize
+    const createRes = await request(app).post("/api/releases").send({ version: "1.0.1", title: "TEST- Block " + Date.now(), items: [{ itemType: "FEATURE", title: "F", content: "f" }] });
+    const rId = createRes.body.data.id;
+    await prisma.generatedStatement.create({
+      data: { releaseId: rId, audience: "INTERNAL", statement: "S", impact: "LOW", supportStatus: "SUPPORTED", reviewStatus: "APPROVED", isStale: true, originalEvidenceCount: 0 }
+    });
+    const finRes = await request(app).post(`/api/releases/${rId}/finalize`);
+    expect(finRes.status).toBe(400); // or 500
+  });
+
+  it("compare returns staleStatements with reasons", async () => {
+    // Tested implicitly in `getStatementsByRelease` above, but let's test the specific /versions compare
+    const createRes = await request(app).post("/api/releases").send({ version: "1.0.0", title: "TEST- Compare " + Date.now(), items: [{ itemType: "FEATURE", title: "F", content: "f" }] });
+    const bId = createRes.body.data.id;
+    const bItems = createRes.body.data.items;
+    
+    await prisma.generatedStatement.create({
+      data: { releaseId: bId, audience: "INTERNAL", statement: "S", impact: "LOW", supportStatus: "SUPPORTED", reviewStatus: "APPROVED", isStale: false, originalEvidenceCount: 1, originalEvidenceDisplayIds: [bItems[0].displayId], evidence: { create: [{ releaseItemId: bItems[0].id, sourceHashAtGeneration: bItems[0].contentHash }] } }
+    });
+    
+    const verRes = await request(app).post(`/api/releases/${bId}/versions`).send({ version: "1.1.0" });
+    const tId = verRes.body.data.id;
+    
+    // Change item in tId
+    await request(app).patch(`/api/releases/${tId}`).send({ items: [{ itemType: "FEATURE", title: "F", content: "changed" }] });
+    
+    const compRes = await request(app).get(`/api/releases/${bId}/compare?targetId=${tId}`);
+    expect(compRes.body.data.staleStatements.length).toBe(1);
+    expect(compRes.body.data.staleStatements[0].reasons[0].reason).toBe("CHANGED");
+  });
+
+  it("v1.0 statements are cloned into v1.1 and become stale after a cited item changes", async () => {
+    // Already demonstrated in the test above, but explicitly:
+    // The previous test creates v1.0, clones to v1.1, changes item, and checks compare. 
+    // We can just verify the statements endpoint of tId.
+    const rels = await request(app).get("/api/releases");
+    const tRel = rels.body.data.find((r: any) => r.version === "1.1.0" && r.title.startsWith("TEST- Compare"));
+    const stmts = await request(app).get(`/api/releases/${tRel.id}/statements`);
+    expect(stmts.body.data[0].isStale).toBe(true);
+  });
+});

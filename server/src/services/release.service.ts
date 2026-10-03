@@ -159,6 +159,14 @@ export async function updateRelease(id: string, input: UpdateReleaseInput) {
 
       const toDelete = oldItems.filter(i => !newIdsToKeep.has(i.id)).map(i => i.id);
       if (toDelete.length > 0) {
+        const evs = await tx.statementEvidence.findMany({ where: { releaseItemId: { in: toDelete } } });
+        const stmtIds = [...new Set(evs.map(e => e.statementId))];
+        if (stmtIds.length > 0) {
+          await tx.generatedStatement.updateMany({
+            where: { id: { in: stmtIds } },
+            data: { isStale: true }
+          });
+        }
         await tx.releaseItem.deleteMany({ where: { id: { in: toDelete } } });
       }
     }
@@ -263,6 +271,8 @@ export async function createVersion(originalId: string, newVersionStr: string) {
           supportStatus: stmt.supportStatus,
           reviewStatus: stmt.reviewStatus, // keep review status since content hasn't changed yet
           isStale: stmt.isStale,
+          originalEvidenceCount: stmt.originalEvidenceCount,
+          originalEvidenceDisplayIds: stmt.originalEvidenceDisplayIds,
         }
       });
 
@@ -323,9 +333,74 @@ export async function compareVersions(id1: string, id2: string) {
     return null; // shouldn't happen
   }).filter(Boolean);
 
+  const targetStatements = await prisma.generatedStatement.findMany({
+    where: { releaseId: id2, isStale: true },
+    include: { evidence: { include: { releaseItem: true } } }
+  });
+
+  const baseStatements = await prisma.generatedStatement.findMany({
+    where: { releaseId: id1 },
+    include: { evidence: { include: { releaseItem: true } } }
+  });
+
+  const formatDisplayId = (itemType: string, sortOrder: number) => {
+    const prefix = itemType.split("_").map(w => w[0]).join("");
+    return `${prefix}-${sortOrder.toString().padStart(3, "0")}`;
+  };
+
+  const staleStatements = targetStatements.map(stmt => {
+    const baseStmt = baseStatements.find(s => s.statement === stmt.statement);
+    const citedDisplayIds: string[] = [];
+    const reasons: { displayId: string; reason: string }[] = [];
+
+    if (baseStmt) {
+      for (const ev of baseStmt.evidence) {
+        const dId = formatDisplayId(ev.releaseItem.itemType, ev.releaseItem.sortOrder);
+        citedDisplayIds.push(dId);
+
+        const i2 = map2.get(dId);
+        if (!i2) {
+          reasons.push({ displayId: dId, reason: "REMOVED" });
+        } else {
+          const targetEv = stmt.evidence.find(te => te.releaseItemId === i2.id);
+          if (targetEv && targetEv.sourceHashAtGeneration !== i2.contentHash) {
+            reasons.push({ displayId: dId, reason: "CHANGED" });
+          }
+        }
+      }
+    } else {
+      // Fallback if base statement not found
+      for (const ev of stmt.evidence) {
+        const dId = formatDisplayId(ev.releaseItem.itemType, ev.releaseItem.sortOrder);
+        citedDisplayIds.push(dId);
+        if (ev.sourceHashAtGeneration !== ev.releaseItem.contentHash) {
+          reasons.push({ displayId: dId, reason: "CHANGED" });
+        }
+      }
+      const missingIds = stmt.originalEvidenceDisplayIds.filter(id => !citedDisplayIds.includes(id));
+      for (const dId of missingIds) {
+        reasons.push({ displayId: dId, reason: "REMOVED" });
+      }
+      const totalMissing = stmt.originalEvidenceCount - stmt.evidence.length;
+      const unknownCount = Math.max(0, totalMissing - missingIds.length);
+      for (let i = 0; i < unknownCount; i++) {
+        reasons.push({ displayId: "Unknown", reason: "REMOVED" });
+      }
+    }
+
+    return {
+      id: stmt.id,
+      text: stmt.statement,
+      reviewStatus: stmt.reviewStatus,
+      citedDisplayIds,
+      reasons
+    };
+  });
+
   return {
     baseVersion: rel1.version,
     targetVersion: rel2.version,
-    differences
+    differences,
+    staleStatements
   };
 }

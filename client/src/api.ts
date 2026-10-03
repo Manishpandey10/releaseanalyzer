@@ -121,6 +121,13 @@ export interface Comparison {
     oldContent: string | null;
     newContent: string | null;
   }[];
+  staleStatements: {
+    id: string;
+    text: string;
+    reviewStatus: string;
+    citedDisplayIds: string[];
+    reasons: { displayId: string; reason: string }[];
+  }[];
 }
 
 export async function compareVersions(id: string, otherId: string): Promise<Comparison> {
@@ -159,6 +166,7 @@ export interface Statement {
   reviewStatus: "PENDING" | "APPROVED" | "REJECTED";
   isStale: boolean;
   evidence: { releaseItem: ReleaseItem }[];
+  reasons?: { displayId: string; reason: string }[];
 }
 
 export async function fetchStatements(releaseId: string): Promise<Statement[]> {
@@ -173,6 +181,15 @@ export async function approveStatement(releaseId: string, statementId: string): 
 
 export async function rejectStatement(releaseId: string, statementId: string): Promise<Statement> {
   const res = await fetch(`${API_BASE}/releases/${releaseId}/statements/${statementId}/reject`, { method: "POST" });
+  return handleResponse<Statement>(res);
+}
+
+export async function resolveStatement(releaseId: string, statementId: string, note: string): Promise<Statement> {
+  const res = await fetch(`${API_BASE}/releases/${releaseId}/statements/${statementId}/resolve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ note }),
+  });
   return handleResponse<Statement>(res);
 }
 
