@@ -14,7 +14,11 @@ export async function createRelease(req: Request, res: Response, next: NextFunct
 
     const release = await releaseService.createRelease(parsed.data);
     res.status(201).json(successResponse(release));
-  } catch (err) {
+  } catch (err: any) {
+    if (err.status === 409) {
+      res.status(409).json(errorResponse("CONFLICT", err.message));
+      return;
+    }
     next(err);
   }
 }
@@ -62,6 +66,22 @@ export async function updateRelease(req: Request, res: Response, next: NextFunct
 
 function formatZodError(error: ZodError): string {
   return error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; ");
+}
+
+export async function validateRelease(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    const release = await releaseService.getReleaseById(id!);
+    if (!release) {
+      res.status(404).json(errorResponse("NOT_FOUND", "Release not found"));
+      return;
+    }
+    const { validateReleasePackage } = await import("../domain/validation.js");
+    const result = validateReleasePackage(release.items);
+    res.json(successResponse(result));
+  } catch (err) {
+    next(err);
+  }
 }
 
 export async function analyzeRelease(req: Request, res: Response, next: NextFunction) {

@@ -60,6 +60,8 @@ export default function ReleaseFinal() {
 
   const risks = analysis?.resultJson?.risks || [];
   const limits = release.items?.filter(i => i.itemType === "LIMITATION") || [];
+  const migrations = release.items?.filter(i => i.itemType === "MIGRATION_NOTE") || [];
+  const groups = release.items?.filter(i => i.itemType === "AFFECTED_GROUP") || [];
   const evidence = release.items?.filter(i => i.itemType === "QA_EVIDENCE") || [];
 
   return (
@@ -173,6 +175,46 @@ export default function ReleaseFinal() {
                 <div key={l.id} className="bg-surface-900/50 border border-surface-800 rounded-xl p-4">
                   <span className="text-xs text-orange-400 font-mono">[{l.displayId}]</span>
                   <p className="text-surface-300 text-sm mt-1">{l.content}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* Migration Notes */}
+        <section className="space-y-4">
+          <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+            <span className="w-1.5 h-6 bg-purple-500 rounded-full"></span>
+            Migration Notes
+          </h2>
+          <div className="grid gap-3">
+            {migrations.length === 0 ? (
+              <p className="text-surface-500 text-sm">No migration notes.</p>
+            ) : (
+              migrations.map((m: any) => (
+                <div key={m.id} className="bg-surface-900/50 border border-surface-800 rounded-xl p-4">
+                  <span className="text-xs text-purple-400 font-mono">[{m.displayId}]</span>
+                  <p className="text-surface-300 text-sm mt-1">{m.content}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* Affected Groups */}
+        <section className="space-y-4">
+          <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+            <span className="w-1.5 h-6 bg-cyan-500 rounded-full"></span>
+            Affected Groups
+          </h2>
+          <div className="grid gap-3">
+            {groups.length === 0 ? (
+              <p className="text-surface-500 text-sm">No affected groups.</p>
+            ) : (
+              groups.map((g: any) => (
+                <div key={g.id} className="bg-surface-900/50 border border-surface-800 rounded-xl p-4">
+                  <span className="text-xs text-cyan-400 font-mono">[{g.displayId}]</span>
+                  <p className="text-surface-300 text-sm mt-1">{g.content}</p>
                 </div>
               ))
             )}

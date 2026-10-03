@@ -74,6 +74,7 @@ model Release {
   aiAnalyses       AiAnalysis[]
   statements       GeneratedStatement[]
 
+  @@unique([title, version])
   @@map("releases")
 }
 

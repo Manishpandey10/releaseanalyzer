@@ -22,7 +22,7 @@ describe("AI Analysis Lifecycle", () => {
       .post("/api/releases")
       .send({ 
         version: "5.0.0", 
-        title: "Parallel Test",
+        title: "TEST- Parallel Test " + Date.now(),
         items: [
           {
             itemType: "FEATURE",
@@ -33,6 +33,26 @@ describe("AI Analysis Lifecycle", () => {
             itemType: "QA_EVIDENCE",
             title: "Test QA",
             content: "Test Content"
+          },
+          {
+            itemType: "BEHAVIOR_CHANGE",
+            title: "Behavior",
+            content: "Changed"
+          },
+          {
+            itemType: "LIMITATION",
+            title: "Limit",
+            content: "Limitation"
+          },
+          {
+            itemType: "MIGRATION_NOTE",
+            title: "Migration",
+            content: "Migrate"
+          },
+          {
+            itemType: "AFFECTED_GROUP",
+            title: "Group",
+            content: "Affected"
           }
         ]
       });
@@ -61,7 +81,7 @@ describe("AI Analysis Lifecycle", () => {
     // 1. Create a release
     const createRes = await request(app)
       .post("/api/releases")
-      .send({ version: "6.0.0", title: "Sweep Test" });
+      .send({ version: "6.0.0", title: "TEST- Sweep Test " + Date.now() });
     const releaseId = createRes.body.data.id;
 
     // 2. Insert a fake RUNNING analysis that started 10 minutes ago

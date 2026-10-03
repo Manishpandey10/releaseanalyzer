@@ -54,6 +54,26 @@ export async function fetchRelease(id: string): Promise<Release> {
   return handleResponse<Release>(res);
 }
 
+export interface ValidationSection {
+  key: string;
+  label: string;
+  present: boolean;
+  count: number;
+}
+
+export interface ValidationResult {
+  valid: boolean;
+  sections: ValidationSection[];
+  issues: string[];
+}
+
+export async function validateRelease(id: string): Promise<ValidationResult> {
+  const res = await fetch(`${API_BASE}/releases/${id}/validate`, {
+    method: "POST"
+  });
+  return handleResponse<ValidationResult>(res);
+}
+
 export async function createRelease(payload: CreateReleasePayload): Promise<Release> {
   const res = await fetch(`${API_BASE}/releases`, {
     method: "POST",

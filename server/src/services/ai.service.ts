@@ -61,9 +61,9 @@ export async function analyzeRelease(releaseId: string) {
   const t1 = Date.now();
   console.log(`[AI] DB fetch: ${t1 - t0} ms`);
 
-  const validationErrors = validateReleasePackage(release.items);
-  if (validationErrors.length > 0) {
-    throw new Error(`Invalid release package: ${validationErrors.join(" ")}`);
+  const validation = validateReleasePackage(release.items);
+  if (!validation.valid) {
+    throw new Error(`Invalid release package: ${validation.issues.join(" ")}`);
   }
 
   // Create or reset analysis record

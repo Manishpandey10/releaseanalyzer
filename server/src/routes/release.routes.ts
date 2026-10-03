@@ -10,6 +10,7 @@ router.get("/", releaseController.getAllReleases);
 router.get("/:id", releaseController.getReleaseById);
 router.patch("/:id", releaseController.updateRelease);
 router.post("/:id/finalize", releaseController.finalizeRelease);
+router.post("/:id/validate", releaseController.validateRelease);
 router.post("/:id/analyze", releaseController.analyzeRelease);
 router.get("/:id/analysis", releaseController.getAnalysis);
 router.post("/:id/versions", releaseController.createVersion);

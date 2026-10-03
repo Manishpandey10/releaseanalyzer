@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import type { Release } from "../api";
-import { fetchRelease } from "../api";
+import type { Release, ValidationResult } from "../api";
+import { fetchRelease, validateRelease } from "../api";
 
 const TYPE_COLORS: Record<string, string> = {
   FEATURE: "bg-emerald-500/20 text-emerald-400",
@@ -25,6 +25,10 @@ export default function ReleaseDetail() {
   const [release, setRelease] = useState<Release | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [validating, setValidating] = useState(false);
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -51,6 +55,20 @@ export default function ReleaseDetail() {
     );
   }
 
+  const handleValidate = async () => {
+    if (!release) return;
+    setValidating(true);
+    setValidationError(null);
+    try {
+      const res = await validateRelease(release.id);
+      setValidationResult(res);
+    } catch (err: any) {
+      setValidationError(err.message);
+    } finally {
+      setValidating(false);
+    }
+  };
+
   return (
     <div className="min-h-screen">
       {/* Header */}
@@ -65,6 +83,13 @@ export default function ReleaseDetail() {
             <h1 className="text-lg font-semibold text-white truncate">{release.title}</h1>
           </div>
           <div className="flex gap-2">
+            <button
+              onClick={handleValidate}
+              disabled={validating}
+              className="px-4 py-1.5 bg-surface-800 hover:bg-surface-700 text-white text-sm font-medium rounded-lg transition-colors border border-surface-700 disabled:opacity-50"
+            >
+              {validating ? "Validating..." : "Validate"}
+            </button>
             {release.status !== "FINAL" && (
               <Link
                 to={`/releases/${release.id}/edit`}
@@ -88,17 +113,19 @@ export default function ReleaseDetail() {
               </button>
             )}
             {(() => {
-              const hasChanges = release.items?.some(
-                (i) => i.itemType === "FEATURE" || i.itemType === "BUG_FIX" || i.itemType === "BEHAVIOR_CHANGE"
-              ) ?? false;
-              const hasQA = release.items?.some((i) => i.itemType === "QA_EVIDENCE") ?? false;
-              const canAnalyze = hasChanges && hasQA;
+              const ch = release.items?.filter(i => i.itemType === "FEATURE" || i.itemType === "BUG_FIX").length ?? 0;
+              const bc = release.items?.filter(i => i.itemType === "BEHAVIOR_CHANGE").length ?? 0;
+              const qa = release.items?.filter(i => i.itemType === "QA_EVIDENCE").length ?? 0;
+              const lm = release.items?.filter(i => i.itemType === "LIMITATION").length ?? 0;
+              const mn = release.items?.filter(i => i.itemType === "MIGRATION_NOTE").length ?? 0;
+              const ag = release.items?.filter(i => i.itemType === "AFFECTED_GROUP").length ?? 0;
+              const canAnalyze = ch > 0 && bc > 0 && qa > 0 && lm > 0 && mn > 0 && ag > 0;
 
               if (!canAnalyze) {
                 return (
                   <button
                     disabled
-                    title="Requires at least 1 change item (Feature, Bug Fix, etc.) and 1 QA Evidence item"
+                    title="Requires at least 1 of each section: Changes, Behavior Change, QA, Limitation, Migration Note, Affected Group"
                     className="px-4 py-1.5 bg-primary-600/50 text-white/50 text-sm font-medium rounded-lg border border-primary-500/20 cursor-not-allowed"
                   >
                     Analyze with AI
@@ -145,6 +172,40 @@ export default function ReleaseDetail() {
             </div>
           </div>
         </div>
+
+        {/* Validation Result */}
+        {validationError && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-400">
+            {validationError}
+          </div>
+        )}
+        {validationResult && (
+          <div className="bg-surface-900/50 border border-surface-800 rounded-xl p-6">
+            <h2 className="text-lg font-medium text-white mb-4">Validation Status</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              {validationResult.sections.map(s => (
+                <div key={s.key} className="flex items-center gap-3 bg-surface-800/50 p-3 rounded-lg border border-surface-700">
+                  {s.present ? (
+                    <svg className="w-5 h-5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                  ) : (
+                    <svg className="w-5 h-5 text-red-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  )}
+                  <span className="text-sm font-medium text-surface-200">{s.label}</span>
+                </div>
+              ))}
+            </div>
+            {!validationResult.valid && (
+              <ul className="list-disc list-inside text-sm text-red-400 space-y-1">
+                {validationResult.issues.map((iss, i) => (
+                  <li key={i}>{iss}</li>
+                ))}
+              </ul>
+            )}
+            {validationResult.valid && (
+              <p className="text-sm text-emerald-400 font-medium">Ready for analysis!</p>
+            )}
+          </div>
+        )}
 
         {/* Items */}
         <div>

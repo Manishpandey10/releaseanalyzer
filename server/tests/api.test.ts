@@ -25,7 +25,7 @@ describe("POST /api/releases", () => {
       .post("/api/releases")
       .send({
         version: "1.0.0",
-        title: "Test Release",
+        title: "TEST- Release " + Date.now(),
         items: [
           {
             itemType: "FEATURE",
@@ -43,7 +43,7 @@ describe("POST /api/releases", () => {
     expect(res.status).toBe(201);
     expect(res.body.data).toBeDefined();
     expect(res.body.data.version).toBe("1.0.0");
-    expect(res.body.data.title).toBe("Test Release");
+    expect(res.body.data.title).toMatch(/^TEST- Release \d+$/);
     expect(res.body.data.status).toBe("DRAFT");
     expect(res.body.data.items).toHaveLength(2);
 
@@ -58,6 +58,59 @@ describe("POST /api/releases", () => {
 
     const bugfix = res.body.data.items.find((i: any) => i.itemType === "BUG_FIX");
     expect(bugfix.displayId).toBe("B-001");
+  });
+
+  it("rejects duplicate title and version", async () => {
+    // Generate unique title to avoid conflicts across test runs
+    const uniqueTitle = "TEST-Duplicate-" + Date.now();
+    
+    // First creation
+    const res1 = await request(app)
+      .post("/api/releases")
+      .send({
+        version: "1.0.0",
+        title: uniqueTitle,
+        items: []
+      });
+    expect(res1.status).toBe(201);
+    
+    // Duplicate creation
+    const res2 = await request(app)
+      .post("/api/releases")
+      .send({
+        version: "1.0.0",
+        title: uniqueTitle,
+        items: []
+      });
+    expect(res2.status).toBe(409);
+    expect(res2.body.error.message).toContain("already exists");
+  });
+
+  it("validates a release through /validate endpoint", async () => {
+    const title = "TEST-Validate-" + Date.now();
+    const createRes = await request(app)
+      .post("/api/releases")
+      .send({
+        version: "1.1.0",
+        title: title,
+        items: [
+          { itemType: "FEATURE", title: "F", content: "f" }
+        ]
+      });
+    expect(createRes.status).toBe(201);
+    const releaseId = createRes.body.data.id;
+
+    const valRes = await request(app).post(`/api/releases/${releaseId}/validate`);
+    expect(valRes.status).toBe(200);
+    expect(valRes.body.data.valid).toBe(false);
+    expect(valRes.body.data.issues.length).toBeGreaterThan(0);
+    expect(valRes.body.data.sections).toBeDefined();
+    
+    // Check one of the sections
+    const changeSec = valRes.body.data.sections.find((s: any) => s.key === "CHANGES");
+    expect(changeSec.present).toBe(true);
+    const qaSec = valRes.body.data.sections.find((s: any) => s.key === "QA_EVIDENCE");
+    expect(qaSec.present).toBe(false);
   });
 
   it("rejects request with missing version", async () => {
@@ -112,7 +165,7 @@ describe("GET /api/releases/:id", () => {
     // First create a release
     const createRes = await request(app)
       .post("/api/releases")
-      .send({ version: "2.0.0", title: "Fetch Test" });
+      .send({ version: "2.0.0", title: "TEST- Fetch Test " + Date.now() });
 
     const id = createRes.body.data.id;
 

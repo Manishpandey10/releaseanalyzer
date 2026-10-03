@@ -39,6 +39,15 @@ export async function createRelease(input: CreateReleaseInput) {
     };
   });
 
+  const existing = await prisma.release.findFirst({
+    where: { title: input.title, version: input.version },
+  });
+  if (existing) {
+    const err = new Error("A release with this title and version already exists");
+    (err as any).status = 409;
+    throw err;
+  }
+
   const release = await prisma.release.create({
     data: {
       version: input.version,
