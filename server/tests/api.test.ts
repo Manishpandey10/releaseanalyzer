@@ -4,10 +4,19 @@ import request from "supertest";
 import type { Express } from "express";
 import { createApp } from "../src/app.js";
 
+import prisma from "../src/lib/prisma.js";
+
 let app: Express;
 
 beforeAll(() => {
   app = createApp();
+});
+
+afterAll(async () => {
+  await prisma.release.deleteMany({
+    where: { title: { startsWith: "TEST-" } },
+  });
+  await prisma.$disconnect();
 });
 
 describe("GET /health", () => {
@@ -143,6 +152,69 @@ describe("POST /api/releases", () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe("VALIDATION_ERROR");
+  });
+});
+
+describe("Release Validation and Analysis Rules", () => {
+  const allSections = [
+    { itemType: "FEATURE", title: "F", content: "c" },
+    { itemType: "BEHAVIOR_CHANGE", title: "B", content: "c" },
+    { itemType: "QA_EVIDENCE", title: "Q", content: "c" },
+    { itemType: "LIMITATION", title: "L", content: "c" },
+    { itemType: "MIGRATION_NOTE", title: "M", content: "c" },
+    { itemType: "AFFECTED_GROUP", title: "A", content: "c" }
+  ];
+
+  it("fails if one section is missing and reports correct issue", async () => {
+    // Missing QA_EVIDENCE
+    const items = allSections.filter(s => s.itemType !== "QA_EVIDENCE");
+    
+    const createRes = await request(app).post("/api/releases").send({
+      version: "1.0.0",
+      title: "TEST- Missing QA " + Date.now() + Math.random(),
+      items
+    });
+    expect(createRes.status).toBe(201);
+    const releaseId = createRes.body.data.id;
+
+    const valRes = await request(app).post(`/api/releases/${releaseId}/validate`);
+    expect(valRes.body.data.valid).toBe(false);
+    expect(valRes.body.data.issues.some((iss: string) => iss.includes("QA Evidence"))).toBe(true);
+
+    const qaSec = valRes.body.data.sections.find((s: any) => s.key === "QA_EVIDENCE");
+    expect(qaSec.present).toBe(false);
+  });
+
+  it("FEATURE only (no BUG_FIX) satisfies the Changes section", async () => {
+    // allSections already has FEATURE but no BUG_FIX
+    const createRes = await request(app).post("/api/releases").send({
+      version: "1.0.0",
+      title: "TEST- Feature Only " + Date.now() + Math.random(),
+      items: allSections
+    });
+    expect(createRes.status).toBe(201);
+    const releaseId = createRes.body.data.id;
+
+    const valRes = await request(app).post(`/api/releases/${releaseId}/validate`);
+    expect(valRes.body.data.valid).toBe(true);
+    const changeSec = valRes.body.data.sections.find((s: any) => s.key === "CHANGES");
+    expect(changeSec.present).toBe(true);
+  });
+
+  it("POST analyze on an invalid release returns 400", async () => {
+    // Missing LIMITATION
+    const items = allSections.filter(s => s.itemType !== "LIMITATION");
+    const createRes = await request(app).post("/api/releases").send({
+      version: "1.0.0",
+      title: "TEST- Analyze Invalid " + Date.now() + Math.random(),
+      items
+    });
+    expect(createRes.status).toBe(201);
+    const releaseId = createRes.body.data.id;
+
+    const analyzeRes = await request(app).post(`/api/releases/${releaseId}/analyze`);
+    expect(analyzeRes.status).toBe(400);
+    expect(analyzeRes.body.error.code).toBe("VALIDATION_ERROR");
   });
 });
 

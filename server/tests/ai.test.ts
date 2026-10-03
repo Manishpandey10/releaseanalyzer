@@ -12,6 +12,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await prisma.release.deleteMany({
+    where: { title: { startsWith: "TEST-" } }
+  });
   await prisma.$disconnect();
 });
 

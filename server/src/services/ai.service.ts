@@ -69,7 +69,7 @@ export async function analyzeRelease(releaseId: string) {
   // Create or reset analysis record
   let analysis = await prisma.aiAnalysis.findFirst({ where: { releaseId } });
   
-  if (analysis && analysis.status === "RUNNING") {
+  if (analysis && analysis.status === "RUNNING" && analysis.startedAt) {
     const age = Date.now() - analysis.startedAt.getTime();
     if (age < 3 * 60 * 1000) {
       const err = new Error("Analysis is already running");

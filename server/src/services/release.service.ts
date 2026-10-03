@@ -48,17 +48,27 @@ export async function createRelease(input: CreateReleaseInput) {
     throw err;
   }
 
-  const release = await prisma.release.create({
-    data: {
-      version: input.version,
-      title: input.title,
-      parentReleaseId: input.parentReleaseId ?? null,
-      items: {
-        create: itemsWithHash,
+  let release;
+  try {
+    release = await prisma.release.create({
+      data: {
+        version: input.version,
+        title: input.title,
+        parentReleaseId: input.parentReleaseId ?? null,
+        items: {
+          create: itemsWithHash,
+        },
       },
-    },
-    include: RELEASE_INCLUDE,
-  });
+      include: RELEASE_INCLUDE,
+    });
+  } catch (err: any) {
+    if (err.code === "P2002") {
+      const e = new Error("A release with this title and version already exists");
+      (e as any).status = 409;
+      throw e;
+    }
+    throw err;
+  }
 
   return {
     ...release,
