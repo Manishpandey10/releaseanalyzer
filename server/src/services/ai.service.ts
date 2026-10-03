@@ -292,6 +292,19 @@ UNSUPPORTED CLAIM QUALITY:
 - Statements must not say "all users", "all browsers", or give numbers unless a release item says so; otherwise supportStatus must be PARTIALLY_SUPPORTED or UNSUPPORTED.
 - Keep text short: at most 5 claims, reason max 2 sentences.
 
+STATEMENT FIDELITY:
+- Statements must restate only what the cited item says. Do not add benefits, motives, or outcomes (e.g. "improves security") that no item states. Use the item's own terms; do not swap similar concepts (authorization is not authentication).
+- If a statement adds anything beyond the cited text, its supportStatus must be PARTIALLY_SUPPORTED.
+
+QA COVERAGE STATEMENT:
+- internalStatements must include exactly one statement that summarises QA status. It must cite all QA_EVIDENCE items and state plainly what the QA evidence does cover and what it does not cover. Do not speculate; if QA items are silent on a topic, say so.
+
+IMPACT ANALYSIS COMPLETENESS:
+- Every item of type FEATURE, BUG_FIX, or BEHAVIOR_CHANGE must appear as its own entry in impactAnalysis. Do not omit any of them.
+
+LIMITATION COVERAGE:
+- Every LIMITATION item must be mentioned in at least one internalStatement and at least one clientStatement. Cite the LIMITATION item's ID in each such statement.
+
 === UNTRUSTED DATA BLOCK START ===
 ${itemJson}
 === UNTRUSTED DATA BLOCK END ===

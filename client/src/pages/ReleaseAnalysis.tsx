@@ -145,7 +145,7 @@ export default function ReleaseAnalysis() {
                 )}
                 {!hasChanges && <p className="text-amber-400 text-xs mt-3 font-medium">⚠️ Requires at least one Feature, Bug Fix, or Behavior Change.</p>}
                 {!hasQA && <p className="text-amber-400 text-xs mt-1 font-medium">⚠️ Requires at least one QA Evidence item.</p>}
-                <button onClick={handleAnalyze} disabled={analyzing || !canAnalyze} className="mt-4 px-6 py-2.5 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                <button onClick={() => handleAnalyze()} disabled={analyzing || !canAnalyze} className="mt-4 px-6 py-2.5 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                   {analyzing ? "Analyzing..." : "Retry Analysis"}
                 </button>
               </div>
@@ -163,7 +163,7 @@ export default function ReleaseAnalysis() {
                 {!hasChanges && <p className="text-amber-400 text-xs mt-3 font-medium">⚠️ Requires at least one Feature, Bug Fix, or Behavior Change.</p>}
                 {!hasQA && <p className="text-amber-400 text-xs mt-1 font-medium">⚠️ Requires at least one QA Evidence item.</p>}
                 {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
-                <button onClick={handleAnalyze} disabled={analyzing || !canAnalyze} className="mt-4 px-6 py-2.5 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                <button onClick={() => handleAnalyze()} disabled={analyzing || !canAnalyze} className="mt-4 px-6 py-2.5 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                   {analyzing ? "Analyzing..." : "Analyze with AI"}
                 </button>
               </div>

@@ -3,17 +3,17 @@ import { useNavigate, Link, useParams } from "react-router-dom";
 import { fetchRelease, updateRelease } from "../api";
 
 const ITEM_TYPES = [
-  { value: "FEATURE", label: "Feature", prefix: "F" },
-  { value: "BUG_FIX", label: "Bug Fix", prefix: "B" },
-  { value: "BEHAVIOR_CHANGE", label: "Behavior Change", prefix: "C" },
-  { value: "QA_EVIDENCE", label: "QA Evidence", prefix: "QA" },
-  { value: "LIMITATION", label: "Limitation", prefix: "LIMIT" },
-  { value: "MIGRATION_NOTE", label: "Migration Note", prefix: "MIGRATION" },
-  { value: "AFFECTED_GROUP", label: "Affected Group", prefix: "GROUP" },
+  { value: "FEATURE", label: "Feature", prefix: "F", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
+  { value: "BUG_FIX", label: "Bug Fix", prefix: "B", color: "bg-red-500/20 text-red-400 border-red-500/30" },
+  { value: "BEHAVIOR_CHANGE", label: "Behavior Change", prefix: "C", color: "bg-amber-500/20 text-amber-400 border-amber-500/30" },
+  { value: "QA_EVIDENCE", label: "QA Evidence", prefix: "QA", color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" },
+  { value: "LIMITATION", label: "Limitation", prefix: "LIMIT", color: "bg-orange-500/20 text-orange-400 border-orange-500/30" },
+  { value: "MIGRATION_NOTE", label: "Migration Note", prefix: "MIGRATION", color: "bg-purple-500/20 text-purple-400 border-purple-500/30" },
+  { value: "AFFECTED_GROUP", label: "Affected Group", prefix: "GROUP", color: "bg-surface-500/20 text-surface-400 border-surface-500/30" },
 ] as const;
 
 interface ItemDraft {
-  id: string; // we use string to hold real IDs or temporary ones
+  id: string; // string to hold real IDs or temporary ones
   itemType: string;
   title: string;
   content: string;
@@ -28,6 +28,7 @@ export default function EditRelease() {
   const [version, setVersion] = useState("");
   const [title, setTitle] = useState("");
   const [items, setItems] = useState<ItemDraft[]>([]);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,11 +55,8 @@ export default function EditRelease() {
             }))
           : [];
         setItems(mappedItems);
-        setInitialData({
-          version: rel.version,
-          title: rel.title,
-          items: mappedItems,
-        });
+        // existing items load collapsed — none in the expandedIds set
+        setInitialData({ version: rel.version, title: rel.title, items: mappedItems });
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -80,7 +78,18 @@ export default function EditRelease() {
       }));
 
   function addItem() {
-    setItems([...items, { id: `temp-${tempIdCounter++}`, itemType: "FEATURE", title: "", content: "" }]);
+    const newId = `temp-${tempIdCounter++}`;
+    setItems((prev) => [...prev, { id: newId, itemType: "FEATURE", title: "", content: "" }]);
+    setExpandedIds((prev) => new Set(prev).add(newId)); // new item starts expanded
+  }
+
+  function toggleExpanded(itemId: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
   }
 
   function updateItem(itemId: string, field: keyof ItemDraft, value: string) {
@@ -89,6 +98,7 @@ export default function EditRelease() {
 
   function removeItem(itemId: string) {
     setItems(items.filter((item) => item.id !== itemId));
+    setExpandedIds((prev) => { const next = new Set(prev); next.delete(itemId); return next; });
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -96,7 +106,6 @@ export default function EditRelease() {
     if (!id) return;
     setError(null);
     setSubmitting(true);
-
     try {
       await updateRelease(id, {
         version,
@@ -116,7 +125,11 @@ export default function EditRelease() {
   const labelClass = "block text-sm font-medium text-surface-300 mb-1.5";
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
   }
 
   return (
@@ -148,42 +161,127 @@ export default function EditRelease() {
             </div>
           </div>
 
-          <div className="space-y-4">
+          {/* Release items */}
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-medium text-white">Release Items</h2>
-              <button type="button" onClick={addItem} className="px-3 py-1.5 text-sm bg-surface-800 hover:bg-surface-700 text-surface-300 hover:text-white border border-surface-700 rounded-lg transition-all">+ Add Item</button>
+              <h2 className="text-lg font-medium text-white">
+                Release Items
+                {items.length > 0 && (
+                  <span className="ml-2 text-xs font-mono text-surface-500">({items.length})</span>
+                )}
+              </h2>
+              <button
+                type="button"
+                onClick={addItem}
+                className="px-3 py-1.5 text-sm bg-surface-800 hover:bg-surface-700 text-surface-300 hover:text-white border border-surface-700 rounded-lg transition-all"
+              >
+                + Add Item
+              </button>
             </div>
 
-            {items.map((item, idx) => (
-              <div key={item.id} className="bg-surface-900/50 border border-surface-800 rounded-xl p-5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono text-surface-500">Item #{idx + 1}</span>
-                  <button type="button" onClick={() => removeItem(item.id)} className="text-surface-500 hover:text-red-400 transition-colors">✕</button>
-                </div>
-
-                <div>
-                  <label className={labelClass}>Type</label>
-                  <select value={item.itemType} onChange={(e) => updateItem(item.id, "itemType", e.target.value)} className={inputClass}>
-                    {ITEM_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>{t.label} ({t.prefix})</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className={labelClass}>Title</label>
-                  <input type="text" required value={item.title} onChange={(e) => updateItem(item.id, "title", e.target.value)} className={inputClass} />
-                </div>
-                <div>
-                  <label className={labelClass}>Content</label>
-                  <textarea required rows={3} value={item.content} onChange={(e) => updateItem(item.id, "content", e.target.value)} className={`${inputClass} resize-y`} />
-                </div>
+            {items.length === 0 && (
+              <div className="bg-surface-900/30 border border-dashed border-surface-700 rounded-xl p-8 text-center">
+                <p className="text-surface-500 text-sm">No items yet. Add features, bug fixes, and other changes.</p>
               </div>
-            ))}
+            )}
+
+            {items.map((item, idx) => {
+              const isOpen = expandedIds.has(item.id);
+              const typeInfo = ITEM_TYPES.find((t) => t.value === item.itemType) ?? ITEM_TYPES[0];
+
+              return (
+                <div
+                  key={item.id}
+                  className="bg-surface-900/50 border border-surface-800 rounded-xl overflow-hidden"
+                >
+                  {/* Collapsible header */}
+                  <button
+                    type="button"
+                    onClick={() => toggleExpanded(item.id)}
+                    className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-surface-800/40 transition-colors group"
+                  >
+                    {/* Chevron */}
+                    <svg
+                      className={`w-4 h-4 text-surface-500 group-hover:text-surface-300 shrink-0 transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+
+                    {/* Type badge */}
+                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border shrink-0 ${typeInfo.color}`}>
+                      {typeInfo.prefix}
+                    </span>
+
+                    {/* Title preview */}
+                    <span className="text-sm text-surface-300 truncate flex-1 group-hover:text-white transition-colors">
+                      {item.title || <span className="text-surface-600 italic">Item #{idx + 1} — untitled</span>}
+                    </span>
+
+                    {/* Index */}
+                    <span className="text-xs font-mono text-surface-600 shrink-0">#{idx + 1}</span>
+
+                    {/* Remove */}
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); removeItem(item.id); } }}
+                      className="text-surface-600 hover:text-red-400 transition-colors shrink-0 p-1 rounded"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </span>
+                  </button>
+
+                  {/* Collapsible body */}
+                  {isOpen && (
+                    <div className="px-5 pb-5 pt-1 space-y-3 border-t border-surface-800/60">
+                      <div>
+                        <label className={labelClass}>Type</label>
+                        <select
+                          value={item.itemType}
+                          onChange={(e) => updateItem(item.id, "itemType", e.target.value)}
+                          className={inputClass}
+                        >
+                          {ITEM_TYPES.map((t) => (
+                            <option key={t.value} value={t.value}>{t.label} ({t.prefix})</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className={labelClass}>Title</label>
+                        <input
+                          type="text"
+                          required
+                          value={item.title}
+                          onChange={(e) => updateItem(item.id, "title", e.target.value)}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Content</label>
+                        <textarea
+                          required
+                          rows={3}
+                          value={item.content}
+                          onChange={(e) => updateItem(item.id, "content", e.target.value)}
+                          className={`${inputClass} resize-y`}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
-          {error && <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-400 text-sm">{error}</div>}
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-400 text-sm">{error}</div>
+          )}
 
-          {/* Floating Action Bar - appears when there are unsaved changes */}
+          {/* Floating Action Bar */}
           <div
             className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ease-out ${
               isDirty
