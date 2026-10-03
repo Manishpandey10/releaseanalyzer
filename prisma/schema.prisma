@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ──────────────────────────────────────────────────
+
+enum ReleaseStatus {
+  DRAFT
+  ANALYZED
+  IN_REVIEW
+  FINAL
+}
+
+enum ReleaseItemType {
+  FEATURE
+  BUG_FIX
+  BEHAVIOR_CHANGE
+  QA_EVIDENCE
+  LIMITATION
+  MIGRATION_NOTE
+  AFFECTED_GROUP
+}
+
+enum AnalysisStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum Audience {
+  INTERNAL
+  CLIENT
+}
+
+enum Impact {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum SupportStatus {
+  SUPPORTED
+  PARTIALLY_SUPPORTED
+  UNSUPPORTED
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ─── Tables ─────────────────────────────────────────────────
+
+model Release {
+  id               String          @id @default(uuid())
+  version          String
+  title            String
+  status           ReleaseStatus   @default(DRAFT)
+  parentReleaseId  String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  parentRelease    Release?        @relation("ReleaseLineage", fields: [parentReleaseId], references: [id], onDelete: SetNull)
+  childReleases    Release[]       @relation("ReleaseLineage")
+
+  items            ReleaseItem[]
+  aiAnalyses       AiAnalysis[]
+  statements       GeneratedStatement[]
+
+  @@map("releases")
+}
+
+model ReleaseItem {
+  id           String          @id @default(uuid())
+  releaseId    String
+  itemType     ReleaseItemType
+  title        String
+  content      String
+  sortOrder    Int             @default(0)
+  contentHash  String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  release      Release         @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  evidenceFor  StatementEvidence[]
+
+  @@map("release_items")
+}
+
+model AiAnalysis {
+  id          String         @id @default(uuid())
+  releaseId   String
+  status      AnalysisStatus @default(PENDING)
+  model       String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  error       String?
+  resultJson  Json?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  release     Release        @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+
+  @@map("ai_analyses")
+}
+
+model GeneratedStatement {
+  id            String        @id @default(uuid())
+  releaseId     String
+  audience      Audience
+  statement     String
+  impact        Impact
+  supportStatus SupportStatus @default(UNSUPPORTED)
+  reviewStatus  ReviewStatus  @default(PENDING)
+  isStale       Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  release       Release       @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  evidence      StatementEvidence[]
+
+  @@map("generated_statements")
+}
+
+model StatementEvidence {
+  statementId           String
+  releaseItemId         String
+  sourceHashAtGeneration String
+
+  statement    GeneratedStatement @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  releaseItem  ReleaseItem        @relation(fields: [releaseItemId], references: [id], onDelete: Cascade)
+
+  @@id([statementId, releaseItemId])
+  @@map("statement_evidence")
+}
