@@ -126,6 +126,16 @@ export async function finalizeRelease(req: Request, res: Response, next: NextFun
     const result = await releaseService.finalizeRelease(id!);
     res.json(successResponse(result));
   } catch (err) {
+    if (err instanceof Error && err.message === "Cannot finalize release." && (err as any).details) {
+      res.status(400).json({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: err.message,
+          details: (err as any).details
+        }
+      });
+      return;
+    }
     if (err instanceof Error && err.message.includes("Cannot finalize")) {
       res.status(400).json(errorResponse("VALIDATION_ERROR", err.message));
       return;

@@ -90,6 +90,7 @@ describe("AI Analysis with Mock", () => {
       }
     });
 
+    await prisma.releaseItem.updateMany({ where: { releaseId }, data: { title: "bump" + Date.now() } });
     const res = await request(app).post(`/api/releases/${releaseId}/analyze`);
     expect(res.status).toBe(409);
     
@@ -113,6 +114,7 @@ describe("AI Analysis with Mock", () => {
       })
     });
 
+    await prisma.releaseItem.updateMany({ where: { releaseId }, data: { title: "bump" + Date.now() } });
     const res = await request(app).post(`/api/releases/${releaseId}/analyze`).send({ force: true });
     expect(res.status).toBe(200);
 
@@ -135,6 +137,8 @@ describe("AI Analysis with Mock", () => {
       })
     });
 
+    await prisma.releaseItem.update({ where: { id: items[0].id }, data: { title: "Bump " + Date.now() } });
+    await prisma.releaseItem.updateMany({ where: { releaseId }, data: { title: "bump" + Date.now() } });
     const res = await request(app).post(`/api/releases/${releaseId}/analyze`);
     expect(res.status).toBe(200);
 
@@ -152,6 +156,7 @@ describe("AI Analysis with Mock", () => {
 
     await request(app).post(`/api/releases/${releaseId}/finalize`);
 
+    await prisma.releaseItem.updateMany({ where: { releaseId }, data: { title: "bump" + Date.now() } });
     const res = await request(app).post(`/api/releases/${releaseId}/analyze`);
     expect(res.status).toBe(409);
   });
@@ -192,6 +197,7 @@ describe("AI Output Quality with Mock", () => {
       })
     });
 
+    await prisma.releaseItem.updateMany({ where: { releaseId }, data: { title: "bump" + Date.now() } });
     const res = await request(app).post(`/api/releases/${releaseId}/analyze`);
     expect(res.status).toBe(200);
 
@@ -204,6 +210,7 @@ describe("AI Output Quality with Mock", () => {
 
   it("malformed JSON from the fake client -> FAILED, not RUNNING", async () => {
     mockGenerateContent.mockResolvedValue({ text: "Not JSON { [ {" });
+    await prisma.releaseItem.updateMany({ where: { releaseId }, data: { title: "bump" + Date.now() } });
     const res = await request(app).post(`/api/releases/${releaseId}/analyze`);
     expect(res.status).toBe(200);
 
@@ -222,6 +229,7 @@ describe("AI Output Quality with Mock", () => {
       })
     });
 
+    await prisma.releaseItem.updateMany({ where: { releaseId }, data: { title: "bump" + Date.now() } });
     const res = await request(app).post(`/api/releases/${releaseId}/analyze`);
     expect(res.status).toBe(200);
 
@@ -291,6 +299,7 @@ describe("Support Status Enforcement with Mock", () => {
       })
     });
 
+    await prisma.releaseItem.updateMany({ where: { releaseId }, data: { title: "bump" + Date.now() } });
     const res = await request(app).post(`/api/releases/${releaseId}/analyze`);
     expect(res.status).toBe(200);
     await new Promise(r => setTimeout(r, 1000));
@@ -336,6 +345,7 @@ describe("Support Status Enforcement with Mock", () => {
       })
     });
 
+    await prisma.releaseItem.updateMany({ where: { releaseId }, data: { title: "bump" + Date.now() } });
     const res = await request(app).post(`/api/releases/${releaseId}/analyze`).send({ force: true });
     expect(res.status).toBe(200);
     await new Promise(r => setTimeout(r, 1000));
@@ -377,6 +387,7 @@ describe("Support Status Enforcement with Mock", () => {
       })
     });
 
+    await prisma.releaseItem.updateMany({ where: { releaseId }, data: { title: "bump" + Date.now() } });
     const res = await request(app).post(`/api/releases/${releaseId}/analyze`).send({ force: true });
     expect(res.status).toBe(200);
     await new Promise(r => setTimeout(r, 1000));
@@ -443,6 +454,7 @@ describe("Coverage Warnings with Mock", () => {
       })
     });
 
+    await prisma.releaseItem.updateMany({ where: { releaseId }, data: { title: "bump" + Date.now() } });
     const res = await request(app).post(`/api/releases/${releaseId}/analyze`).send({ force: true });
     expect(res.status).toBe(200);
     await new Promise(r => setTimeout(r, 1000));
@@ -477,6 +489,7 @@ describe("Coverage Warnings with Mock", () => {
       })
     });
 
+    await prisma.releaseItem.updateMany({ where: { releaseId }, data: { title: "bump" + Date.now() } });
     const res = await request(app).post(`/api/releases/${releaseId}/analyze`).send({ force: true });
     expect(res.status).toBe(200);
     await new Promise(r => setTimeout(r, 1000));
@@ -517,6 +530,7 @@ describe("Coverage Warnings with Mock", () => {
       })
     });
 
+    await prisma.releaseItem.updateMany({ where: { releaseId }, data: { title: "bump" + Date.now() } });
     const res = await request(app).post(`/api/releases/${releaseId}/analyze`).send({ force: true });
     expect(res.status).toBe(200);
     await new Promise(r => setTimeout(r, 1000));
@@ -552,6 +566,7 @@ describe("Coverage Warnings with Mock", () => {
       })
     });
 
+    await prisma.releaseItem.updateMany({ where: { releaseId }, data: { title: "bump" + Date.now() } });
     const res = await request(app).post(`/api/releases/${releaseId}/analyze`).send({ force: true });
     expect(res.status).toBe(200);
     await new Promise(r => setTimeout(r, 1000));
@@ -613,6 +628,7 @@ describe("Risk Kind Computation with Mock", () => {
       })
     });
 
+    await prisma.releaseItem.updateMany({ where: { releaseId }, data: { title: "bump" + Date.now() } });
     const res = await request(app).post(`/api/releases/${releaseId}/analyze`).send({ force: true });
     expect(res.status).toBe(200);
     await new Promise(r => setTimeout(r, 1000));
@@ -649,6 +665,7 @@ describe("Risk Kind Computation with Mock", () => {
       })
     });
 
+    await prisma.releaseItem.updateMany({ where: { releaseId }, data: { title: "bump" + Date.now() } });
     const res = await request(app).post(`/api/releases/${releaseId}/analyze`).send({ force: true });
     expect(res.status).toBe(200);
     await new Promise(r => setTimeout(r, 1000));

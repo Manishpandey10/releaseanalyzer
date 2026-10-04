@@ -26,17 +26,13 @@ function hasNumberMismatch(title: string, content: string): boolean {
   if (titleNums.size === 0) return false;
   
   const contentNums = new Set((content.match(numRegex) || []).map(n => n.replace(/,/g, "")));
+  // If content has no numbers at all, it's not a contradiction, just an omission.
+  if (contentNums.size === 0) return false;
   
-  // Mismatch if there's a number in the title that isn't in the content, or vice-versa
-  // The simplest reliable warning: if ANY title number is missing from content, OR ANY content number is missing from title
-  // But usually title is a summary, so title having numbers content doesn't is a red flag,
-  // or they both have numbers but they don't match.
-  // We'll warn if there is any symmetric difference in numbers found.
+  // Warn only if there's a number in the title that is missing from the content,
+  // which indicates a potential contradiction since content DOES have numbers.
   for (const n of titleNums) {
     if (!contentNums.has(n)) return true;
-  }
-  for (const n of contentNums) {
-    if (!titleNums.has(n)) return true;
   }
   return false;
 }

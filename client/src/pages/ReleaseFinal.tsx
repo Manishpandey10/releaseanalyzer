@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { fetchRelease, fetchStatements, fetchAnalysis, finalizeRelease, type Release, type Statement, type AiAnalysis } from "../api";
+import { fetchRelease, fetchStatements, fetchAnalysis, finalizeRelease, ApiError, type Release, type Statement, type AiAnalysis } from "../api";
 
 export default function ReleaseFinal() {
   const { id } = useParams<{ id: string }>();
@@ -8,7 +8,7 @@ export default function ReleaseFinal() {
   const [statements, setStatements] = useState<Statement[]>([]);
   const [analysis, setAnalysis] = useState<AiAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; details?: any } | null>(null);
   const [finalizing, setFinalizing] = useState(false);
 
   useEffect(() => {
@@ -19,7 +19,7 @@ export default function ReleaseFinal() {
         setStatements(stmts);
         setAnalysis(an);
       })
-      .catch((err) => setError(err.message))
+      .catch((err) => setError({ message: err.message }))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -31,7 +31,11 @@ export default function ReleaseFinal() {
       const rel = await finalizeRelease(id);
       setRelease(rel);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to finalize");
+      if (err instanceof ApiError) {
+        setError({ message: err.message, details: err.details });
+      } else {
+        setError({ message: err instanceof Error ? err.message : "Failed to finalize" });
+      }
     } finally {
       setFinalizing(false);
     }
@@ -95,8 +99,32 @@ export default function ReleaseFinal() {
 
       <main className="max-w-4xl mx-auto px-6 py-8 space-y-10">
         {error && (
-          <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-xl text-sm">
-            {error}
+          <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-6 rounded-xl text-sm flex flex-col gap-4">
+            <div className="font-semibold text-base">{error.message}</div>
+            {error.details && (
+              <div className="space-y-1">
+                {error.details.pendingCount > 0 && (
+                  <div>{error.details.pendingCount} statement{error.details.pendingCount === 1 ? ' is' : 's are'} still pending review.</div>
+                )}
+                {error.details.staleCount > 0 && (
+                  <div>{error.details.staleCount} statement{error.details.staleCount === 1 ? ' is' : 's are'} stale because their source evidence changed.</div>
+                )}
+                <div className="mt-4 pt-4 border-t border-red-500/20 text-red-300">
+                  Please review the pending statements and resolve/re-analyze the stale statements before finalizing.
+                </div>
+                <div className="mt-4">
+                  <Link 
+                    to={`/releases/${release.id}/review`}
+                    className="inline-block px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 font-medium rounded-lg transition-colors border border-red-500/30"
+                  >
+                    Go to Review Page
+                  </Link>
+                </div>
+              </div>
+            )}
+            {!error.details && (
+              <div>{error.message}</div>
+            )}
           </div>
         )}
 

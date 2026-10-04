@@ -202,14 +202,19 @@ export async function finalizeRelease(id: string) {
     throw new Error("Cannot finalize without reviewed AI statements.");
   }
 
-  const pending = release.statements.filter(s => s.reviewStatus === "PENDING");
-  if (pending.length > 0) {
-    throw new Error(`Cannot finalize: ${pending.length} statements are still pending review.`);
-  }
+  const pendingStatements = release.statements.filter(s => s.reviewStatus === "PENDING");
+  const staleStatements = release.statements.filter(s => s.isStale);
 
-  const stale = release.statements.filter(s => s.isStale && s.reviewStatus === "APPROVED");
-  if (stale.length > 0) {
-    throw new Error(`Cannot finalize: ${stale.length} approved statements are marked stale.`);
+  if (pendingStatements.length > 0 || staleStatements.length > 0) {
+    const err = new Error("Cannot finalize release.");
+    (err as any).status = 400;
+    (err as any).details = {
+      pendingCount: pendingStatements.length,
+      staleCount: staleStatements.length,
+      pendingStatementIds: pendingStatements.map(s => s.id),
+      staleStatementIds: staleStatements.map(s => s.id),
+    };
+    throw err;
   }
 
   const finalized = await prisma.release.update({

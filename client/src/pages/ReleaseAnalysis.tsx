@@ -26,6 +26,7 @@ export default function ReleaseAnalysis() {
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [modalStep, setModalStep] = useState<'CONFIRM' | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -44,7 +45,14 @@ export default function ReleaseAnalysis() {
       interval = setInterval(async () => {
         try {
           const an = await fetchAnalysis(id!);
-          if (an) setAnalysis(an);
+          if (an) {
+            setAnalysis(an);
+            // When analysis completes, refetch release to get fresh timestamps
+            if (an.status === "COMPLETED" || an.status === "FAILED") {
+              const rel = await fetchRelease(id!);
+              setRelease(rel);
+            }
+          }
         } catch (err) {
           console.error("Poll error:", err);
         }
@@ -60,6 +68,34 @@ export default function ReleaseAnalysis() {
   const hasQA = release?.items?.some((i) => i.itemType === "QA_EVIDENCE") ?? false;
   const canAnalyze = hasChanges && hasQA;
 
+  // sourcePackageChanged: derived from persisted timestamps only
+  // true when any item was modified after the latest completed analysis
+  const sourcePackageChanged = (() => {
+    if (!analysis || analysis.status !== "COMPLETED" || !analysis.completedAt) return false;
+    const completedTime = new Date(analysis.completedAt).getTime();
+    
+    // Only check item timestamps. Do not check release.updatedAt because 
+    // the backend updates the release status to ANALYZED right after completion,
+    // which makes release.updatedAt always newer than analysis.completedAt.
+    if (release?.items?.some(i =>
+      new Date(i.updatedAt).getTime() > completedTime ||
+      new Date(i.createdAt).getTime() > completedTime
+    )) return true;
+    return false;
+  })();
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (modalStep !== null) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [modalStep]);
+
   const handleAnalyze = async (force = false) => {
     if (!id || !canAnalyze) return;
     setAnalyzing(true);
@@ -67,17 +103,23 @@ export default function ReleaseAnalysis() {
     try {
       const an = await analyzeRelease(id, force);
       setAnalysis(an);
+      setModalStep(null);
+      // If analysis went to RUNNING, polling will pick up completion.
+      // If it returned COMPLETED immediately, refetch release for fresh timestamps.
+      if (an.status === "COMPLETED") {
+        const rel = await fetchRelease(id);
+        setRelease(rel);
+      }
     } catch (err: any) {
-      if (err.message.includes("Re-analysis would replace reviewed statements")) {
-        const confirm = window.confirm("Reviewed statements will be replaced. Are you sure you want to proceed?");
-        if (confirm) {
-          handleAnalyze(true);
-          return;
-        }
+      if (err.message.includes("reviewed/edited work")) {
+        // 409: reviewed work exists → show CONFIRM modal
+        setModalStep('CONFIRM');
       } else if (err.message.includes("409")) {
         setError("Analysis is already running.");
+        setModalStep(null);
       } else {
         setError(err instanceof Error ? err.message : "Analysis failed");
+        setModalStep(null);
       }
     } finally {
       setAnalyzing(false);
@@ -105,6 +147,23 @@ export default function ReleaseAnalysis() {
     return <Navigate to={`/releases/${release.id}`} replace />;
   }
 
+  const renderEvidenceTags = (evidenceIds?: string[]) => {
+    if (!evidenceIds || !evidenceIds.length) return null;
+    return evidenceIds.map((e: string) => {
+      const item = release?.items?.find((i) => i.displayId === e);
+      return (
+        <span key={e} className="group relative inline-flex items-center text-[11px] bg-surface-800/80 text-surface-300 px-2 py-0.5 rounded border border-surface-700 hover:border-surface-600 hover:text-surface-200 transition-all cursor-default">
+          <span className="font-mono font-medium">[{e}]</span>
+          {item?.title && (
+            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[300px] px-2.5 py-1.5 bg-surface-700 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-20 shadow-xl truncate">
+              {item.title}
+            </span>
+          )}
+        </span>
+      );
+    });
+  };
+
   return (
     <div className="min-h-screen pb-12">
       <header className="border-b border-surface-800 bg-surface-950/80 backdrop-blur-xl sticky top-0 z-10">
@@ -117,14 +176,27 @@ export default function ReleaseAnalysis() {
             </Link>
             <h1 className="text-lg font-semibold text-white truncate">AI Analysis: {release.title}</h1>
           </div>
-          {analysis?.status === "COMPLETED" && (
-            <Link
-              to={`/releases/${release.id}/review`}
-              className="px-4 py-1.5 bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium rounded-lg transition-colors"
-            >
-              Review Statements
-            </Link>
-          )}
+          <div className="flex items-center gap-3">
+            {analysis?.status === "COMPLETED" && (
+              <>
+                {sourcePackageChanged && (
+                  <button
+                    onClick={() => handleAnalyze()}
+                    disabled={analyzing || !canAnalyze}
+                    className="px-4 py-1.5 bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/50 text-orange-400 text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {analyzing ? "Analyzing..." : "Update Analysis"}
+                  </button>
+                )}
+                <Link
+                  to={`/releases/${release.id}/review`}
+                  className="px-4 py-1.5 bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  Review Statements
+                </Link>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
@@ -184,7 +256,30 @@ export default function ReleaseAnalysis() {
           </div>
         )}
 
-        {analysis?.status === "COMPLETED" && analysis.resultJson && (
+        {analysis?.status === "COMPLETED" && sourcePackageChanged && (
+          <div className="bg-surface-900/50 border border-orange-500/30 rounded-xl p-12 text-center space-y-4">
+            <div className="w-12 h-12 rounded-full bg-orange-500/10 text-orange-400 flex items-center justify-center text-2xl mx-auto mb-2">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h2 className="text-lg font-medium text-white">Analysis Out of Date</h2>
+            <p className="text-surface-400 text-sm max-w-md mx-auto">
+              Source items have been modified since this analysis was completed. The previous report may no longer reflect the current release package.
+            </p>
+            {error && <p className="text-red-400 text-sm">{error}</p>}
+            <button
+              onClick={() => handleAnalyze()}
+              disabled={analyzing || !canAnalyze}
+              className="mt-4 px-6 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+            >
+              {analyzing && <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
+              {analyzing ? "Analyzing..." : "Update Analysis"}
+            </button>
+          </div>
+        )}
+
+        {analysis?.status === "COMPLETED" && !sourcePackageChanged && analysis.resultJson && (
           <div className="space-y-8 animate-[fadeIn_0.3s_ease-out]">
             {/* Impact Analysis */}
             <section className="space-y-4">
@@ -205,10 +300,8 @@ export default function ReleaseAnalysis() {
                         </div>
                         <p className="text-surface-300 text-sm leading-relaxed">{item.reason}</p>
                       </div>
-                      <div className="shrink-0 flex gap-1">
-                        {item.evidenceIds?.map((e: string) => (
-                          <span key={e} className="text-[10px] font-mono bg-surface-800 text-surface-400 px-1.5 py-0.5 rounded">[{e}]</span>
-                        ))}
+                      <div className="shrink-0 flex gap-1 items-center flex-wrap">
+                        {renderEvidenceTags(item.evidenceIds)}
                       </div>
                     </div>
                   </div>
@@ -232,10 +325,8 @@ export default function ReleaseAnalysis() {
                         <span className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold border ${SUPPORT_COLORS[item.status] || SUPPORT_COLORS.UNSUPPORTED}`}>
                           ⚠ {item.status.replace("_", " ")}
                         </span>
-                        <div className="shrink-0 flex gap-1">
-                          {item.evidenceIds?.map((e: string) => (
-                            <span key={e} className="text-[10px] font-mono bg-surface-800 text-surface-400 px-1.5 py-0.5 rounded">[{e}]</span>
-                          ))}
+                        <div className="shrink-0 flex gap-1 items-center flex-wrap">
+                          {renderEvidenceTags(item.evidenceIds)}
                         </div>
                       </div>
                       <p className="text-white text-sm font-medium mb-1">Claim: {item.claim}</p>
@@ -272,10 +363,8 @@ export default function ReleaseAnalysis() {
                           </div>
                           <p className="text-surface-300 text-sm leading-relaxed">{item.description}</p>
                         </div>
-                        <div className="shrink-0 flex gap-1">
-                          {item.evidenceIds?.map((e: string) => (
-                            <span key={e} className="text-[10px] font-mono bg-surface-800 text-surface-400 px-1.5 py-0.5 rounded">[{e}]</span>
-                          ))}
+                        <div className="shrink-0 flex gap-1 items-center flex-wrap">
+                          {renderEvidenceTags(item.evidenceIds)}
                         </div>
                       </div>
                     </div>
@@ -306,9 +395,9 @@ export default function ReleaseAnalysis() {
                               {item.supportStatus.replace("_", " ")}
                             </span>
                           )}
-                          {item.evidenceIds?.map((e: string) => (
-                            <span key={e} className="text-[10px] font-mono text-surface-500 hover:text-surface-300 transition-colors cursor-pointer">[{e}]</span>
-                          ))}
+                          <div className="flex gap-1 items-center flex-wrap justify-end">
+                            {renderEvidenceTags(item.evidenceIds)}
+                          </div>
                         </div>
                       </div>
                       {downgrade && (
@@ -342,9 +431,9 @@ export default function ReleaseAnalysis() {
                               {item.supportStatus.replace("_", " ")}
                             </span>
                           )}
-                          {item.evidenceIds?.map((e: string) => (
-                            <span key={e} className="text-[10px] font-mono text-surface-500 hover:text-surface-300 transition-colors cursor-pointer">[{e}]</span>
-                          ))}
+                          <div className="flex gap-1 items-center flex-wrap justify-end">
+                            {renderEvidenceTags(item.evidenceIds)}
+                          </div>
                         </div>
                       </div>
                       {downgrade && (
@@ -406,6 +495,49 @@ export default function ReleaseAnalysis() {
           </div>
         )}
       </main>
+
+      {/* Overwrite Confirmation Modal — only shown on 409 (reviewed work exists) */}
+      {modalStep === 'CONFIRM' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-[fadeIn_0.3s_ease-out]">
+          <div className="bg-surface-900/90 border border-red-500/30 rounded-2xl p-8 max-w-md w-full flex flex-col items-center text-center space-y-5 transform scale-100 animate-[bounceIn_0.4s_ease-out] shadow-[0_0_50px_-12px_rgba(239,68,68,0.25)] relative">
+            
+            {/* Spinner overlay during force re-analysis */}
+            {analyzing && (
+              <div className="absolute inset-0 bg-surface-900/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-2xl z-10">
+                <div className="w-10 h-10 border-4 border-red-500 border-t-transparent rounded-full animate-spin mb-4" />
+                <p className="text-red-400 font-medium animate-pulse">Running Gemini AI...</p>
+              </div>
+            )}
+
+            <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center text-3xl shadow-[0_0_20px_-5px_rgba(239,68,68,0.4)]">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold text-white tracking-tight">Overwrite Reviewed Work?</h3>
+              <p className="text-surface-300 text-sm leading-relaxed">
+                You have manually <span className="text-white font-medium">approved or edited</span> statements for this release. A new Gemini analysis will completely replace your reviewed work.
+              </p>
+            </div>
+            <div className="flex gap-3 w-full mt-4 pt-2">
+              <button
+                onClick={() => setModalStep(null)}
+                className="flex-1 py-2.5 bg-surface-800 hover:bg-surface-700 border border-surface-700 text-white rounded-xl text-sm font-semibold transition-all hover:scale-[1.02]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleAnalyze(true)}
+                disabled={analyzing}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-bold transition-all shadow-[0_0_15px_-3px_rgba(239,68,68,0.4)] hover:shadow-[0_0_25px_-3px_rgba(239,68,68,0.6)] hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
+              >
+                Proceed & Replace
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

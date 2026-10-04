@@ -158,24 +158,33 @@ export default function ReleaseReview() {
             )}
 
             {/* Evidence Tags */}
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className="text-xs text-surface-500">Evidence:</span>
+            <div className="mt-4 flex flex-wrap gap-2 items-center">
+              <span className="text-xs text-surface-500 font-medium">Evidence:</span>
               {stmt.evidence.map((ev, idx) => (
-                <span key={idx} className="text-[10px] font-mono bg-surface-800 text-surface-400 px-1.5 py-0.5 rounded">
-                  [{ev.releaseItem?.displayId || "Unknown"}]
+                <span key={idx} className="group relative inline-flex items-center text-[11px] bg-surface-800/80 text-surface-300 px-2 py-0.5 rounded border border-surface-700 hover:border-surface-600 hover:text-surface-200 transition-all cursor-default">
+                  <span className="font-mono font-medium">[{ev.releaseItem?.displayId || "Unknown"}]</span>
+                  {ev.releaseItem?.title && (
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[300px] px-2.5 py-1.5 bg-surface-700 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-20 shadow-xl truncate">
+                      {ev.releaseItem.title}
+                    </span>
+                  )}
                 </span>
               ))}
             </div>
 
             {/* Stale Reasons */}
             {stmt.isStale && stmt.reasons && stmt.reasons.length > 0 && (
-              <div className="mt-4 bg-orange-500/10 border border-orange-500/20 rounded-lg p-3">
-                <span className="text-xs text-orange-400 font-semibold mb-2 block">Staleness Reasons:</span>
-                <div className="space-y-1">
+              <div className="mt-5 bg-gradient-to-r from-orange-500/10 to-amber-500/5 border border-orange-500/30 rounded-xl p-4 shadow-inner relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-orange-500 to-amber-500"></div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-6 h-6 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center text-sm shadow-[0_0_10px_rgba(245,158,11,0.2)]">⚠</span>
+                  <span className="text-sm text-orange-400 font-bold tracking-wide uppercase">Source Modified</span>
+                </div>
+                <div className="space-y-2 pl-8">
                   {stmt.reasons.map((r, i) => (
-                    <div key={i} className="flex gap-2 text-xs">
-                      <span className="font-mono text-surface-400">[{r.displayId}]</span>
-                      <span className="text-orange-300">{r.reason}</span>
+                    <div key={i} className="flex items-center gap-3 text-sm bg-black/20 p-2 rounded-lg border border-white/5">
+                      <span className="font-mono font-medium text-surface-300 bg-surface-900 px-2 py-0.5 rounded-md border border-surface-700 shadow-sm shrink-0">[{r.displayId}]</span>
+                      <span className="text-orange-200/90 font-medium leading-relaxed">{r.reason}</span>
                     </div>
                   ))}
                 </div>

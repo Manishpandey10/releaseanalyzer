@@ -364,7 +364,7 @@ describe("Staleness Edge Cases and Resolution", () => {
     expect(editRes.body.data.reviewStatus).toBe("PENDING");
   });
 
-  it("rejected stale statement does not block finalize", async () => {
+  it("rejected stale statement blocks finalize", async () => {
     // Approve stmt3 to be safe
     await request(app).post(`/api/releases/${releaseId}/statements/${stmtUnrelatedId}/approve`);
     
@@ -377,13 +377,13 @@ describe("Staleness Edge Cases and Resolution", () => {
     
     await request(app).post(`/api/releases/${releaseId}/statements/${stmt4.id}/reject`);
     
-    // Attempt finalize (should pass if no other pendings/stale approved exist)
+    // Attempt finalize (should fail because of stale rejected statement)
     // Wait, stmt2 is PENDING right now after the edit. Let's approve it.
     await request(app).post(`/api/releases/${releaseId}/statements/${stmt2Id}/approve`);
 
     const finRes = await request(app).post(`/api/releases/${releaseId}/finalize`);
-    if (finRes.status !== 200) console.log("Finalize failed:", finRes.body);
-    expect(finRes.status).toBe(200);
+    expect(finRes.status).toBe(400);
+    expect(finRes.body.error.details.staleCount).toBeGreaterThan(0);
   });
 
   it("finalize blocked while a stale approved statement exists", async () => {
@@ -495,7 +495,7 @@ describe("isEdited property rules", () => {
 
     const res = await request(app).post(`/api/releases/${releaseId}/analyze`);
     expect(res.status).toBe(409);
-    expect(res.text).toMatch(/replace reviewed statements/);
+    expect(res.text).toMatch(/source package changed but there is already reviewed\/edited work/);
   });
 
   it("re-analyze does NOT return 409 when the only change is system stale marking", async () => {

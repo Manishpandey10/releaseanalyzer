@@ -36,10 +36,19 @@ export interface CreateReleasePayload {
   }[];
 }
 
+export class ApiError extends Error {
+  details?: any;
+  constructor(message: string, details?: any) {
+    super(message);
+    this.name = "ApiError";
+    this.details = details;
+  }
+}
+
 async function handleResponse<T>(res: Response): Promise<T> {
   const json = await res.json();
   if (!res.ok) {
-    throw new Error(json.error?.message || "Request failed");
+    throw new ApiError(json.error?.message || "Request failed", json.error?.details);
   }
   return json.data as T;
 }
@@ -141,6 +150,8 @@ export interface AiAnalysis {
   status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED";
   error: string | null;
   resultJson: any; // We'll type this specifically if needed
+  startedAt: string | null;
+  completedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

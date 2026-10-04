@@ -5,11 +5,16 @@ import { ReviewStatus } from "@prisma/client";
 
 export async function approveStatement(id: string, statementId: string) {
   const statement = await prisma.generatedStatement.findFirst({
-    where: { id: statementId, releaseId: id }
+    where: { id: statementId, releaseId: id },
+    include: { evidence: { include: { releaseItem: true } } }
   });
   if (!statement) return null;
 
-  if (statement.isStale) {
+  const isActuallyStale = statement.isStale || statement.evidence.some(
+    ev => ev.sourceHashAtGeneration !== ev.releaseItem.contentHash
+  );
+
+  if (isActuallyStale) {
     const err = new Error("Cannot approve a stale statement");
     (err as any).status = 409;
     throw err;
