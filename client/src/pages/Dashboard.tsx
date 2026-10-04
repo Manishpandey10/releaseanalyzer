@@ -113,6 +113,11 @@ export default function Dashboard() {
                       <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_COLORS[release.status] || "bg-surface-700 text-surface-300"}`}>
                         {release.status.replace("_", " ")}
                       </span>
+                      {release.title.startsWith("DEMO ") && (
+                        <span className="text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-semibold tracking-wide">
+                          DEMO
+                        </span>
+                      )}
                     </div>
                     <h3 className="text-white font-medium group-hover:text-primary-400 transition-colors truncate">
                       {release.title}

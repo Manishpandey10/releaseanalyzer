@@ -174,26 +174,12 @@ export async function compareVersions(req: Request, res: Response, next: NextFun
   }
 }
 
+import { generateDemoReleases } from "../services/demo.service.js";
+
 export async function generateDemoRelease(req: Request, res: Response, next: NextFunction) {
   try {
-    const demoItems = [
-      { itemType: "FEATURE", title: "Bulk CSV Import", content: "Users can import up to 10,000 records using CSV.", sortOrder: 1 },
-      { itemType: "BUG_FIX", title: "Checkout timeout fix", content: "Fixed checkout sessions expiring prematurely.", sortOrder: 1 },
-      { itemType: "BEHAVIOR_CHANGE", title: "Session timeout", content: "Inactive sessions now expire after 15 minutes.\nPrevious behavior: 30 minutes.", sortOrder: 1 },
-      { itemType: "QA_EVIDENCE", title: "CSV import test", content: "1,000 valid records imported successfully in Chrome 140.", sortOrder: 1 },
-      { itemType: "QA_EVIDENCE", title: "Session expiration test", content: "Session timeout behavior verified successfully in Chrome 140.", sortOrder: 2 },
-      { itemType: "LIMITATION", title: "CSV Limit", content: "CSV imports are limited to 10,000 records.", sortOrder: 1 },
-      { itemType: "MIGRATION_NOTE", title: "Timeout Config", content: "SESSION_TIMEOUT_MINUTES changed to 15.", sortOrder: 1 },
-      { itemType: "AFFECTED_GROUP", title: "Users", content: "Existing users.", sortOrder: 1 },
-    ];
-
-    const release = await releaseService.createRelease({
-      version: "1.0.0",
-      title: "March Platform Release",
-      items: demoItems as any[]
-    });
-    
-    res.json(successResponse(release));
+    await generateDemoReleases();
+    res.json(successResponse({ success: true }));
   } catch (err) {
     next(err);
   }

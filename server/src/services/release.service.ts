@@ -307,7 +307,7 @@ export async function createVersion(originalId: string, newVersionStr: string) {
       ...fullNew!,
       items: addDisplayIds(fullNew!.items)
     };
-  });
+  }, { maxWait: 10000, timeout: 30000 });
 }
 
 export async function compareVersions(id1: string, id2: string) {
