@@ -1,4 +1,4 @@
-import "./src/lib/config.js";
+npm install -D @types/express @types/corsimport "./src/lib/config.js";
 import { analyzeRelease } from "./src/services/ai.service.js";
 
 async function run() {
