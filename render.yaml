@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: releaseanalyst-server
+    env: node
+    rootDir: server
+    buildCommand: npm install && npm run db:generate && npx prisma migrate deploy && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: releaseanalyst-db
+          property: connectionString
+      - key: CLIENT_ORIGIN
+        value: https://releaseanalyst-client.onrender.com
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.7-flash
+  - type: web
+    name: releaseanalyst-client
+    env: static
+    rootDir: client
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://releaseanalyst-server.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+databases:
+  - name: releaseanalyst-db
+    databaseName: releaseanalyst
+    user: releaseanalyst

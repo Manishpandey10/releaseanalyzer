@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import type { Release, ValidationResult } from "../api";
 import { fetchRelease, validateRelease } from "../api";
+import LifecycleStepper from "../components/LifecycleStepper";
+import WhatsNext from "../components/WhatsNext";
 
 const TYPE_COLORS: Record<string, string> = {
   FEATURE: "bg-emerald-500/20 text-emerald-400",
@@ -120,6 +122,10 @@ export default function ReleaseDetail() {
             <h1 className="text-lg font-semibold text-white truncate">{release.title}</h1>
           </div>
           <div className="flex gap-2">
+            <Link to="/" className="px-3 py-1.5 bg-surface-800 hover:bg-surface-700 text-surface-300 hover:text-white text-sm font-medium rounded-lg transition-colors border border-surface-700 flex items-center gap-2" title="Home">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+              <span className="hidden sm:inline">Home</span>
+            </Link>
             <button
               onClick={handleValidate}
               disabled={validating}
@@ -182,28 +188,114 @@ export default function ReleaseDetail() {
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
+        <LifecycleStepper releaseId={release.id} status={release.status as any} />
+        
+        <WhatsNext 
+          releaseId={release.id} 
+          status={release.status as any}
+          canAnalyze={(() => {
+            const ch = release.items?.filter(i => i.itemType === "FEATURE" || i.itemType === "BUG_FIX" || i.itemType === "BEHAVIOR_CHANGE").length ?? 0;
+            const qa = release.items?.filter(i => i.itemType === "QA_EVIDENCE").length ?? 0;
+            return ch > 0 && qa > 0;
+          })()}
+        />
+
         {/* Metadata */}
         <div className="bg-surface-900/50 border border-surface-800 rounded-xl p-6">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div>
-              <span className="text-xs text-surface-500 uppercase tracking-wider">Version</span>
-              <p className="text-white font-mono mt-1">{release.version}</p>
+          <div className="flex flex-col md:flex-row gap-6 md:items-center justify-between">
+            <div className="flex gap-8">
+              <div>
+                <span className="text-xs text-surface-500 uppercase tracking-wider">Status</span>
+                <p className="mt-1">
+                  <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_COLORS[release.status] || ""}`}>
+                    {release.status.replace("_", " ")}
+                  </span>
+                </p>
+              </div>
+              <div>
+                <span className="text-xs text-surface-500 uppercase tracking-wider">Created</span>
+                <p className="text-surface-300 text-sm mt-1">{new Date(release.createdAt).toLocaleString()}</p>
+              </div>
+              <div>
+                <span className="text-xs text-surface-500 uppercase tracking-wider">Items</span>
+                <p className="text-white font-medium mt-1">{release.items?.length ?? 0}</p>
+              </div>
             </div>
-            <div>
-              <span className="text-xs text-surface-500 uppercase tracking-wider">Status</span>
-              <p className="mt-1">
-                <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_COLORS[release.status] || ""}`}>
-                  {release.status.replace("_", " ")}
-                </span>
-              </p>
-            </div>
-            <div>
-              <span className="text-xs text-surface-500 uppercase tracking-wider">Created</span>
-              <p className="text-surface-300 text-sm mt-1">{new Date(release.createdAt).toLocaleString()}</p>
-            </div>
-            <div>
-              <span className="text-xs text-surface-500 uppercase tracking-wider">Items</span>
-              <p className="text-white font-medium mt-1">{release.items?.length ?? 0}</p>
+            
+            {/* Version Lineage / History */}
+            <div className="bg-surface-950/50 p-4 rounded-lg border border-surface-800 md:min-w-[300px]">
+              {release.parentRelease ? (
+                <>
+                  <span className="text-xs text-surface-500 uppercase tracking-wider mb-3 block">Version Lineage</span>
+                  <div className="space-y-1">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex flex-col">
+                        <span className="text-surface-400 font-mono text-sm">v{release.parentRelease.version}</span>
+                        <span className="text-surface-500 text-xs truncate max-w-[200px]" title={release.parentRelease.title}>{release.parentRelease.title}</span>
+                      </div>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${STATUS_COLORS[release.parentRelease.status] || "bg-surface-800"}`}>{release.parentRelease.status.replace("_", " ")}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-surface-500 ml-2 py-1">
+                      <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                      <div className="flex gap-2 text-xs">
+                        <Link to={`/releases/${release.parentRelease.id}`} className="text-primary-400 hover:text-primary-300 transition-colors">View Parent</Link>
+                        <span>•</span>
+                        <Link to={`/releases/${release.parentRelease.id}/compare/${release.id}`} className="text-primary-400 hover:text-primary-300 transition-colors">Compare with v{release.parentRelease.version}</Link>
+                      </div>
+                    </div>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex flex-col">
+                        <span className="text-white font-mono text-sm font-medium">v{release.version}</span>
+                        <span className="text-surface-400 text-xs truncate max-w-[200px]" title={release.title}>{release.title}</span>
+                      </div>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${STATUS_COLORS[release.status] || "bg-surface-800"}`}>{release.status.replace("_", " ")}</span>
+                    </div>
+                  </div>
+                </>
+              ) : release.childReleases && release.childReleases.length > 0 ? (
+                <>
+                  <span className="text-xs text-surface-500 uppercase tracking-wider mb-3 block">Version History</span>
+                  <div className="space-y-1">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex flex-col">
+                        <span className="text-surface-400 font-mono text-sm">v{release.version}</span>
+                        <span className="text-surface-500 text-xs truncate max-w-[200px]" title={release.title}>{release.title}</span>
+                      </div>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${STATUS_COLORS[release.status] || "bg-surface-800"}`}>{release.status.replace("_", " ")}</span>
+                    </div>
+                    {release.childReleases.map(child => (
+                      <div key={child.id}>
+                        <div className="flex items-center gap-3 text-surface-500 ml-2 py-1">
+                          <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                          <div className="flex gap-2 text-xs">
+                            <Link to={`/releases/${child.id}`} className="text-primary-400 hover:text-primary-300 transition-colors">View v{child.version}</Link>
+                            <span>•</span>
+                            <Link to={`/releases/${release.id}/compare/${child.id}`} className="text-primary-400 hover:text-primary-300 transition-colors">Compare with v{child.version}</Link>
+                          </div>
+                        </div>
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex flex-col">
+                            <span className="text-white font-mono text-sm font-medium">v{child.version}</span>
+                            <span className="text-surface-400 text-xs truncate max-w-[200px]" title={child.title}>{child.title}</span>
+                          </div>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${STATUS_COLORS[child.status] || "bg-surface-800"}`}>{child.status.replace("_", " ")}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="text-xs text-surface-500 uppercase tracking-wider mb-3 block">Version Lineage</span>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex flex-col">
+                      <span className="text-white font-mono text-sm font-medium">v{release.version}</span>
+                      <span className="text-surface-400 text-xs truncate max-w-[200px]" title={release.title}>{release.title}</span>
+                    </div>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${STATUS_COLORS[release.status] || "bg-surface-800"}`}>{release.status.replace("_", " ")}</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

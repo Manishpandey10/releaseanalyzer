@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { fetchRelease, fetchStatements, updateStatementContent, approveStatement, rejectStatement, resolveStatement, type Release, type Statement } from "../api";
+import LifecycleStepper from "../components/LifecycleStepper";
+import WhatsNext from "../components/WhatsNext";
 
 const IMPACT_COLORS: Record<string, string> = {
   LOW: "text-emerald-400 border-emerald-500/30",
@@ -174,20 +176,31 @@ export default function ReleaseReview() {
 
             {/* Stale Reasons */}
             {stmt.isStale && stmt.reasons && stmt.reasons.length > 0 && (
-              <div className="mt-5 bg-gradient-to-r from-orange-500/10 to-amber-500/5 border border-orange-500/30 rounded-xl p-4 shadow-inner relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-orange-500 to-amber-500"></div>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="w-6 h-6 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center text-sm shadow-[0_0_10px_rgba(245,158,11,0.2)]">⚠</span>
-                  <span className="text-sm text-orange-400 font-bold tracking-wide uppercase">Source Modified</span>
-                </div>
-                <div className="space-y-2 pl-8">
-                  {stmt.reasons.map((r, i) => (
-                    <div key={i} className="flex items-center gap-3 text-sm bg-black/20 p-2 rounded-lg border border-white/5">
-                      <span className="font-mono font-medium text-surface-300 bg-surface-900 px-2 py-0.5 rounded-md border border-surface-700 shadow-sm shrink-0">[{r.displayId}]</span>
-                      <span className="text-orange-200/90 font-medium leading-relaxed">{r.reason}</span>
+              <div className="mt-5 space-y-3">
+                {stmt.reasons.map((r, i) => (
+                  <div key={i} className="bg-gradient-to-r from-orange-500/10 to-amber-500/5 border border-orange-500/30 rounded-xl p-4 shadow-inner relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-orange-500 to-amber-500"></div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="w-6 h-6 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center text-sm shadow-[0_0_10px_rgba(245,158,11,0.2)]">⚠</span>
+                      <span className="text-sm text-orange-400 font-bold tracking-wide uppercase">Needs re-review</span>
                     </div>
-                  ))}
-                </div>
+                    
+                    <div className="pl-8 space-y-2">
+                      <p className="text-sm text-orange-200/90 leading-relaxed">
+                        {r.reason === "CHANGED" 
+                          ? "Source content changed after this statement was generated."
+                          : "The source item used by this statement was removed from this release version."}
+                      </p>
+                      
+                      <div className="flex items-center gap-2 text-sm bg-black/20 p-2 rounded-lg border border-white/5 inline-flex">
+                        <span className="text-surface-400">Source:</span>
+                        <span className="font-mono font-medium text-surface-300 bg-surface-900 px-2 py-0.5 rounded-md border border-surface-700 shadow-sm shrink-0">
+                          {r.displayId}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -270,16 +283,31 @@ export default function ReleaseReview() {
             </Link>
             <h1 className="text-lg font-semibold text-white truncate">Review AI Statements: {release.title}</h1>
           </div>
-          <Link
-            to={`/releases/${release.id}/final`}
-            className="px-4 py-1.5 bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            Finalize Release
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link to="/" className="px-3 py-1.5 bg-surface-800 hover:bg-surface-700 text-surface-300 hover:text-white text-sm font-medium rounded-lg transition-colors border border-surface-700 flex items-center gap-2" title="Home">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+              <span className="hidden sm:inline">Home</span>
+            </Link>
+            <Link
+              to={`/releases/${release.id}/final`}
+              className="px-4 py-1.5 bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              Finalize Release
+            </Link>
+          </div>
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-8 space-y-10">
+        <LifecycleStepper releaseId={release.id} status={release.status as any} />
+        
+        <WhatsNext 
+          releaseId={release.id} 
+          status={release.status as any}
+          pendingCount={statements.filter(s => s.reviewStatus === "PENDING").length}
+          staleCount={statements.filter(s => s.isStale).length}
+        />
+
         {error && (
           <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-xl text-sm">
             {error}

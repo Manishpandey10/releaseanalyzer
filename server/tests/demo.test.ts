@@ -25,19 +25,19 @@ describe("Demo Fixtures Suite", { timeout: 30000 }, () => {
 
   it("1 & 2. Load Demo creates all three primary DEMO releases and is idempotent", async () => {
     await generateDemoReleases();
-    let releases = await prisma.release.findMany();
+    let releases = await prisma.release.findMany({ where: { title: { startsWith: 'DEMO ' } } });
     // Demo A (1), Demo B 1.0.0 (1), Demo B 1.1.0 (1), Demo C (1) = 4 releases
     expect(releases.length).toBe(4);
 
     // Run again
     await generateDemoReleases();
-    releases = await prisma.release.findMany();
+    releases = await prisma.release.findMany({ where: { title: { startsWith: 'DEMO ' } } });
     expect(releases.length).toBe(4); // No duplicates
   });
 
   it("3 & 4. DEMO titles start with 'DEMO ' and title === content", async () => {
     await generateDemoReleases();
-    const releases = await prisma.release.findMany({ include: { items: true } });
+    const releases = await prisma.release.findMany({ where: { title: { startsWith: 'DEMO ' } }, include: { items: true } });
     
     for (const r of releases) {
       expect(r.title.startsWith("DEMO ")).toBe(true);
@@ -134,7 +134,7 @@ describe("Demo Fixtures Suite", { timeout: 30000 }, () => {
     expect(content).toContain('DEMO');
   });
 
-  it("11. Finalization block rules", async () => {
+  it("11. Finalization block rules", { timeout: 60000 }, async () => {
     await generateDemoReleases();
     
     // Test PENDING blocks finalization

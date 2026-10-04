@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Release } from "../api";
-import { fetchReleases } from "../api";
+import { fetchReleases, generateDemoRelease } from "../api";
 
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-amber-500/20 text-amber-400 border-amber-500/30",
@@ -13,6 +13,7 @@ const STATUS_COLORS: Record<string, string> = {
 export default function Dashboard() {
   const [releases, setReleases] = useState<Release[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingDemo, setLoadingDemo] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -21,6 +22,19 @@ export default function Dashboard() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
+
+  const handleLoadDemo = async () => {
+    try {
+      setLoadingDemo(true);
+      await generateDemoRelease();
+      const updated = await fetchReleases();
+      setReleases(updated);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Demo failed");
+    } finally {
+      setLoadingDemo(false);
+    }
+  };
 
   return (
     <div className="min-h-screen">
@@ -35,18 +49,18 @@ export default function Dashboard() {
           </div>
           <div className="flex gap-3">
             <button
-              onClick={async () => {
-                try {
-                  const { generateDemoRelease } = await import("../api");
-                  await generateDemoRelease();
-                  window.location.reload();
-                } catch (err) {
-                  alert(err instanceof Error ? err.message : "Demo failed");
-                }
-              }}
-              className="px-4 py-2 bg-surface-800 hover:bg-surface-700 text-white rounded-lg text-sm font-medium transition-all duration-200 border border-surface-700 hover:shadow-lg"
+              onClick={handleLoadDemo}
+              disabled={loadingDemo}
+              className="px-4 py-2 bg-surface-800 hover:bg-surface-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-all duration-200 border border-surface-700 hover:shadow-lg flex items-center gap-2"
             >
-              Load Demo Release
+              {loadingDemo ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Loading Demo...</span>
+                </>
+              ) : (
+                "Load Demo Release"
+              )}
             </button>
             <Link
               to="/create"
@@ -86,13 +100,29 @@ export default function Dashboard() {
               </svg>
             </div>
             <h3 className="text-lg font-medium text-surface-300 mb-1">No releases yet</h3>
-            <p className="text-surface-500 text-sm mb-6">Create your first release package to get started</p>
-            <Link
-              to="/create"
-              className="inline-flex px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-all duration-200"
-            >
-              + Create Release
-            </Link>
+            <p className="text-surface-500 text-sm mb-6">Create your first release package or load sample demo fixtures to get started</p>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={handleLoadDemo}
+                disabled={loadingDemo}
+                className="px-4 py-2 bg-surface-800 hover:bg-surface-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-all duration-200 border border-surface-700 flex items-center gap-2"
+              >
+                {loadingDemo ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Loading Demo...</span>
+                  </>
+                ) : (
+                  "Load Demo Release"
+                )}
+              </button>
+              <Link
+                to="/create"
+                className="inline-flex px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-all duration-200"
+              >
+                + Create Release
+              </Link>
+            </div>
           </div>
         )}
 

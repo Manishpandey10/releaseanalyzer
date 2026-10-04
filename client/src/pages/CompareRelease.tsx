@@ -62,6 +62,11 @@ export default function CompareRelease() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
             <span className="text-primary-400 font-medium text-sm">{comparison.targetVersion}</span>
+            <div className="w-px h-4 bg-surface-800 mx-1 hidden sm:block"></div>
+            <Link to="/" className="px-3 py-1.5 bg-surface-800 hover:bg-surface-700 text-surface-300 hover:text-white text-sm font-medium rounded-lg transition-colors border border-surface-700 flex items-center gap-2" title="Home">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+              <span className="hidden sm:inline">Home</span>
+            </Link>
           </div>
         </div>
       </header>
@@ -91,6 +96,11 @@ export default function CompareRelease() {
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase border ${CHANGE_COLORS[diff.changeCategory]}`}>
                   {diff.changeCategory}
                 </span>
+              </div>
+              <div className="bg-surface-800/30 px-4 py-2 border-b border-surface-800/50">
+                {diff.changeCategory === "CHANGED" && <p className="text-xs text-amber-500/80">Statements citing this source became stale.</p>}
+                {diff.changeCategory === "REMOVED" && <p className="text-xs text-red-400/80">Source item removed from this version.</p>}
+                {diff.changeCategory === "ADDED" && <p className="text-xs text-emerald-400/80">New source item added in this version.</p>}
               </div>
               <div className="grid grid-cols-2 divide-x divide-surface-800">
                 <div className="p-4 bg-red-500/5">

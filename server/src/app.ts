@@ -4,11 +4,13 @@ import releaseRoutes from "./routes/release.routes.js";
 import { errorMiddleware } from "./middleware/error.js";
 import { successResponse } from "./lib/response.js";
 
+import { config } from "./lib/config.js";
+
 export function createApp() {
   const app = express();
 
   // Middleware
-  app.use(cors());
+  app.use(cors({ origin: config.clientOrigin }));
   app.use(express.json());
 
   // Health check

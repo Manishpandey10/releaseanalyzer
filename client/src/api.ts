@@ -1,4 +1,4 @@
-const API_BASE = "/api";
+const API_BASE = (import.meta.env.VITE_API_URL || "") + "/api";
 
 export interface ReleaseItem {
   id: string;
@@ -19,6 +19,8 @@ export interface Release {
   title: string;
   status: string;
   parentReleaseId: string | null;
+  parentRelease?: { id: string; version: string; title: string; status: string } | null;
+  childReleases?: { id: string; version: string; title: string; status: string }[];
   createdAt: string;
   updatedAt: string;
   items?: ReleaseItem[];
@@ -92,9 +94,9 @@ export async function createRelease(payload: CreateReleasePayload): Promise<Rele
   return handleResponse<Release>(res);
 }
 
-export async function generateDemoRelease(): Promise<Release> {
+export async function generateDemoRelease(): Promise<{ success?: boolean } | Release> {
   const res = await fetch(`${API_BASE}/releases/demo`, { method: "POST" });
-  return handleResponse<Release>(res);
+  return handleResponse<{ success?: boolean } | Release>(res);
 }
 
 export async function updateRelease(id: string, payload: Partial<CreateReleasePayload>): Promise<Release> {

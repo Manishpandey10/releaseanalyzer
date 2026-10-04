@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { fetchRelease, fetchStatements, fetchAnalysis, finalizeRelease, ApiError, type Release, type Statement, type AiAnalysis } from "../api";
+import LifecycleStepper from "../components/LifecycleStepper";
+import WhatsNext from "../components/WhatsNext";
+
+const STATUS_COLORS: Record<string, string> = {
+  DRAFT: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+  ANALYZED: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  IN_REVIEW: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  FINAL: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+};
 
 export default function ReleaseFinal() {
   const { id } = useParams<{ id: string }>();
@@ -80,44 +89,131 @@ export default function ReleaseFinal() {
             </Link>
             <h1 className="text-lg font-semibold text-white truncate">Final Brief: {release.title}</h1>
           </div>
-          {release.status !== "FINAL" && (
-            <button
-              onClick={handleFinalize}
-              disabled={finalizing}
-              className="px-4 py-1.5 bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
-            >
-              {finalizing ? "Finalizing..." : "Confirm Finalize"}
-            </button>
-          )}
-          {release.status === "FINAL" && (
-            <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-sm font-bold rounded-lg border border-emerald-500/30 uppercase">
-              Final
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            <Link to="/" className="px-3 py-1.5 bg-surface-800 hover:bg-surface-700 text-surface-300 hover:text-white text-sm font-medium rounded-lg transition-colors border border-surface-700 flex items-center gap-2" title="Home">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+              <span className="hidden sm:inline">Home</span>
+            </Link>
+            {release.status !== "FINAL" && (
+              <button
+                onClick={handleFinalize}
+                disabled={finalizing}
+                className="px-4 py-1.5 bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+              >
+                {finalizing ? "Finalizing..." : "Confirm Finalize"}
+              </button>
+            )}
+            {release.status === "FINAL" && (
+              <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-sm font-bold rounded-lg border border-emerald-500/30 uppercase">
+                Final
+              </span>
+            )}
+          </div>
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-8 space-y-10">
+        <LifecycleStepper releaseId={release.id} status={release.status as any} />
+        
+        <WhatsNext 
+          releaseId={release.id} 
+          status={release.status as any}
+          pendingCount={statements.filter(s => s.reviewStatus === "PENDING").length}
+          staleCount={statements.filter(s => s.isStale).length}
+        />
+
+        {(release.parentRelease || (release.childReleases && release.childReleases.length > 0)) && (
+          <div className="bg-surface-950/50 p-4 rounded-lg border border-surface-800">
+            {release.parentRelease ? (
+              <>
+                <span className="text-xs text-surface-500 uppercase tracking-wider mb-3 block">Version Lineage</span>
+                <div className="space-y-1">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex flex-col">
+                      <span className="text-surface-400 font-mono text-sm">v{release.parentRelease.version}</span>
+                      <span className="text-surface-500 text-xs truncate max-w-[200px]" title={release.parentRelease.title}>{release.parentRelease.title}</span>
+                    </div>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${STATUS_COLORS[release.parentRelease.status] || "bg-surface-800"}`}>{release.parentRelease.status.replace("_", " ")}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-surface-500 ml-2 py-1">
+                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                    <div className="flex gap-2 text-xs">
+                      <Link to={`/releases/${release.parentRelease.id}`} className="text-primary-400 hover:text-primary-300 transition-colors">View Parent</Link>
+                      <span>•</span>
+                      <Link to={`/releases/${release.parentRelease.id}/compare/${release.id}`} className="text-primary-400 hover:text-primary-300 transition-colors">Compare with v{release.parentRelease.version}</Link>
+                    </div>
+                  </div>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex flex-col">
+                      <span className="text-white font-mono text-sm font-medium">v{release.version}</span>
+                      <span className="text-surface-400 text-xs truncate max-w-[200px]" title={release.title}>{release.title}</span>
+                    </div>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${STATUS_COLORS[release.status] || "bg-surface-800"}`}>{release.status.replace("_", " ")}</span>
+                  </div>
+                </div>
+              </>
+            ) : release.childReleases && release.childReleases.length > 0 ? (
+              <>
+                <span className="text-xs text-surface-500 uppercase tracking-wider mb-3 block">Version History</span>
+                <div className="space-y-1">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex flex-col">
+                      <span className="text-surface-400 font-mono text-sm">v{release.version}</span>
+                      <span className="text-surface-500 text-xs truncate max-w-[200px]" title={release.title}>{release.title}</span>
+                    </div>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${STATUS_COLORS[release.status] || "bg-surface-800"}`}>{release.status.replace("_", " ")}</span>
+                  </div>
+                  {release.childReleases.map(child => (
+                    <div key={child.id}>
+                      <div className="flex items-center gap-3 text-surface-500 ml-2 py-1">
+                        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                        <div className="flex gap-2 text-xs">
+                          <Link to={`/releases/${child.id}`} className="text-primary-400 hover:text-primary-300 transition-colors">View v{child.version}</Link>
+                          <span>•</span>
+                          <Link to={`/releases/${release.id}/compare/${child.id}`} className="text-primary-400 hover:text-primary-300 transition-colors">Compare with v{child.version}</Link>
+                        </div>
+                      </div>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex flex-col">
+                          <span className="text-white font-mono text-sm font-medium">v{child.version}</span>
+                          <span className="text-surface-400 text-xs truncate max-w-[200px]" title={child.title}>{child.title}</span>
+                        </div>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${STATUS_COLORS[child.status] || "bg-surface-800"}`}>{child.status.replace("_", " ")}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : null}
+          </div>
+        )}
+
         {error && (
           <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-6 rounded-xl text-sm flex flex-col gap-4">
-            <div className="font-semibold text-base">{error.message}</div>
+            <div className="font-semibold text-lg text-white">Release cannot be finalized yet</div>
             {error.details && (
-              <div className="space-y-1">
+              <div className="space-y-2">
                 {error.details.pendingCount > 0 && (
-                  <div>{error.details.pendingCount} statement{error.details.pendingCount === 1 ? ' is' : 's are'} still pending review.</div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-red-500 font-bold">✕</span> 
+                    <span>{error.details.pendingCount} statement{error.details.pendingCount === 1 ? '' : 's'} pending review</span>
+                  </div>
                 )}
                 {error.details.staleCount > 0 && (
-                  <div>{error.details.staleCount} statement{error.details.staleCount === 1 ? ' is' : 's are'} stale because their source evidence changed.</div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-red-500 font-bold">✕</span> 
+                    <span>{error.details.staleCount} statement{error.details.staleCount === 1 ? ' needs' : 's need'} re-review</span>
+                  </div>
                 )}
                 <div className="mt-4 pt-4 border-t border-red-500/20 text-red-300">
-                  Please review the pending statements and resolve/re-analyze the stale statements before finalizing.
+                  Review all pending and stale statements before finalizing.
                 </div>
                 <div className="mt-4">
                   <Link 
                     to={`/releases/${release.id}/review`}
-                    className="inline-block px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 font-medium rounded-lg transition-colors border border-red-500/30"
+                    className="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-medium rounded-lg transition-colors shadow-lg shadow-red-500/20"
                   >
-                    Go to Review Page
+                    Go to Review
                   </Link>
                 </div>
               </div>

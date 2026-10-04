@@ -21,8 +21,8 @@ async function main() {
       console.log(`✓ Swept ${count} interrupted AI analysis records.`);
     }
 
-    app.listen(config.port, () => {
-      console.log(`✓ ReleaseAnalyst server running on http://localhost:${config.port}`);
+    app.listen(config.port, "0.0.0.0", () => {
+      console.log(`✓ ReleaseAnalyst server running on http://0.0.0.0:${config.port}`);
       console.log(`✓ Gemini model: ${config.geminiModel}`);
     });
   } catch (err) {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, Navigate } from "react-router-dom";
 import { fetchRelease, fetchAnalysis, analyzeRelease, type Release, type AiAnalysis } from "../api";
+import LifecycleStepper from "../components/LifecycleStepper";
 
 const IMPACT_COLORS: Record<string, string> = {
   LOW: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30",
@@ -177,6 +178,10 @@ export default function ReleaseAnalysis() {
             <h1 className="text-lg font-semibold text-white truncate">AI Analysis: {release.title}</h1>
           </div>
           <div className="flex items-center gap-3">
+            <Link to="/" className="px-3 py-1.5 bg-surface-800 hover:bg-surface-700 text-surface-300 hover:text-white text-sm font-medium rounded-lg transition-colors border border-surface-700 flex items-center gap-2" title="Home">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+              <span className="hidden sm:inline">Home</span>
+            </Link>
             {analysis?.status === "COMPLETED" && (
               <>
                 {sourcePackageChanged && (
@@ -201,6 +206,8 @@ export default function ReleaseAnalysis() {
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-8 space-y-8">
+        <LifecycleStepper releaseId={release.id} status={release.status as any} />
+        
         {/* State Banner */}
         {(!analysis || analysis.status === "FAILED" || error) && (
           <div className="bg-surface-900/50 border border-surface-800 rounded-xl p-8 text-center space-y-4">

@@ -11,4 +11,5 @@ export const config = {
   geminiApiKey: process.env.GEMINI_API_KEY || "",
   geminiModel: process.env.GEMINI_MODEL || "gemini-3.7-flash",
   geminiFallbackModel: process.env.GEMINI_FALLBACK_MODEL || "",
+  clientOrigin: process.env.CLIENT_ORIGIN || "http://localhost:5173",
 } as const;

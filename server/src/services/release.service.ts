@@ -8,6 +8,22 @@ const RELEASE_INCLUDE = {
   items: {
     orderBy: { sortOrder: "asc" as const },
   },
+  parentRelease: {
+    select: {
+      id: true,
+      version: true,
+      title: true,
+      status: true,
+    }
+  },
+  childReleases: {
+    select: {
+      id: true,
+      version: true,
+      title: true,
+      status: true,
+    }
+  }
 } as const;
 
 /**
