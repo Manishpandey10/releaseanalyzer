@@ -436,7 +436,7 @@ export async function analyzeRelease(releaseId: string, force: boolean = false) 
         where: { id: releaseId },
         data: { status: "ANALYZED" }
       });
-    });
+    }, { maxWait: 10000, timeout: 30000 });
 
     const t6 = Date.now();
     console.log(`[AI] AI_ANALYSIS_PERSISTED durationMs=${t6 - t5}`);
