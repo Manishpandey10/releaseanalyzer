@@ -54,8 +54,8 @@ describe("Demo Fixtures Suite", { timeout: 30000 }, () => {
     expect(demoA!.status).toBe("DRAFT");
     
     // validate
-    const validation = validateRelease(demoA!.items as any);
-    expect(validation.missingSections).toHaveLength(0);
+    const validation = validateReleasePackage(demoA!.items as any);
+    expect(validation.issues).toHaveLength(0);
 
     const analyses = await prisma.aiAnalysis.findMany({ where: { releaseId: demoA!.id } });
     expect(analyses.length).toBe(0); // No gemini calls
@@ -121,10 +121,10 @@ describe("Demo Fixtures Suite", { timeout: 30000 }, () => {
     expect(demoC!.status).toBe("DRAFT");
     
     const validation = validateReleasePackage(demoC!.items as any);
-    expect(validation.missingSections.length).toBe(3);
-    expect(validation.missingSections).toContain("Behavior Change");
-    expect(validation.missingSections).toContain("Migration Note");
-    expect(validation.missingSections).toContain("Affected Group");
+    expect(validation.issues.length).toBe(3);
+    expect(validation.issues.some(i => i.includes("Behavior Change"))).toBe(true);
+    expect(validation.issues.some(i => i.includes("Migration Note"))).toBe(true);
+    expect(validation.issues.some(i => i.includes("Affected Group"))).toBe(true);
   });
 
   it("10. Demo badge is present in Dashboard.tsx code", () => {

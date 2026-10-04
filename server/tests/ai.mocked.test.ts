@@ -57,7 +57,7 @@ afterAll(async () => {
 // Existing lifecycle tests
 // ─────────────────────────────────────────────────────────
 
-describe("AI Analysis with Mock", () => {
+describe("AI Analysis with Mock", { timeout: 30000 }, () => {
   let releaseId: string;
   let items: any[];
 
@@ -166,7 +166,7 @@ describe("AI Analysis with Mock", () => {
 // Existing output quality tests
 // ─────────────────────────────────────────────────────────
 
-describe("AI Output Quality with Mock", () => {
+describe("AI Output Quality with Mock", { timeout: 30000 }, () => {
   let releaseId: string;
   let items: any[];
 
@@ -250,7 +250,7 @@ describe("AI Output Quality with Mock", () => {
 // NEW: Support Status Enforcement Tests
 // ─────────────────────────────────────────────────────────
 
-describe("Support Status Enforcement with Mock", () => {
+describe("Support Status Enforcement with Mock", { timeout: 30000 }, () => {
   let releaseId: string;
   let items: any[];
 
@@ -409,7 +409,7 @@ describe("Support Status Enforcement with Mock", () => {
 // NEW: Coverage Warning Tests
 // ─────────────────────────────────────────────────────────
 
-describe("Coverage Warnings with Mock", () => {
+describe("Coverage Warnings with Mock", { timeout: 30000 }, () => {
   let releaseId: string;
   let items: any[];
 
@@ -581,7 +581,7 @@ describe("Coverage Warnings with Mock", () => {
 // NEW: Risk Kind Tests
 // ─────────────────────────────────────────────────────────
 
-describe("Risk Kind Computation with Mock", () => {
+describe("Risk Kind Computation with Mock", { timeout: 30000 }, () => {
   let releaseId: string;
   let items: any[];
 

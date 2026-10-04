@@ -176,7 +176,7 @@ export async function updateRelease(id: string, input: UpdateReleaseInput) {
       where: { id },
       include: RELEASE_INCLUDE,
     });
-  });
+  }, { maxWait: 10000, timeout: 30000 });
 
   if (!release) return null;
 
