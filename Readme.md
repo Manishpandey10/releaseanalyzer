@@ -5,6 +5,11 @@ ReleaseAnalyzer (internally referenced as ReleasePilot) is a specialized applica
 
 By calculating risks and enforcing strict human-in-the-loop review processes, the system prevents the common issue of LLM hallucinations. Engineering teams often write release notes that are either too technical for clients or omit critical limitations and QA evidence. ReleaseAnalyzer solves this by forcing deterministic structures (evidence hashes, validation checks) and using AI purely for semantic synthesis, followed by mandatory human approval before a release can be finalized.
 
+## Live Links
+
+- **Frontend:** https://releaseanalyzer-b8xe2ulli-manishpandey10s-projects.vercel.app
+- **Backend API:** https://releaseanalyzer.onrender.com
+
 ## Core Workflow
 1. **Drafting:** User creates a release and adds items (Features, Bugs, QA Evidence, Limitations, etc.).
 2. **Validation:** System deterministically checks that the release contains all required components.
@@ -90,6 +95,8 @@ npx prisma migrate dev
 # Run development servers
 npm run dev # (in both client and server directories)
 ```
+
+
 
 ## Deployment Details
 The application is deployed as separate frontend and backend services via an automated pipeline:
