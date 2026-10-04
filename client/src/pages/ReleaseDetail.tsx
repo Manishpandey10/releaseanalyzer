@@ -20,6 +20,27 @@ const STATUS_COLORS: Record<string, string> = {
   FINAL: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
 };
 
+function hasNumberMismatch(title: string, content: string): boolean {
+  const numRegex = /\b\d+(?:\.\d+)?%?|\b\d{1,3}(?:,\d{3})+\b/g;
+  const titleNums = new Set((title.match(numRegex) || []).map(n => n.replace(/,/g, "")));
+  if (titleNums.size === 0) return false;
+  
+  const contentNums = new Set((content.match(numRegex) || []).map(n => n.replace(/,/g, "")));
+  
+  // Mismatch if there's a number in the title that isn't in the content, or vice-versa
+  // The simplest reliable warning: if ANY title number is missing from content, OR ANY content number is missing from title
+  // But usually title is a summary, so title having numbers content doesn't is a red flag,
+  // or they both have numbers but they don't match.
+  // We'll warn if there is any symmetric difference in numbers found.
+  for (const n of titleNums) {
+    if (!contentNums.has(n)) return true;
+  }
+  for (const n of contentNums) {
+    if (!titleNums.has(n)) return true;
+  }
+  return false;
+}
+
 export default function ReleaseDetail() {
   const { id } = useParams<{ id: string }>();
   const [release, setRelease] = useState<Release | null>(null);
@@ -29,6 +50,26 @@ export default function ReleaseDetail() {
   const [validating, setValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  // New version modal state
+  const [versionModalOpen, setVersionModalOpen] = useState(false);
+  const [newVersionInput, setNewVersionInput] = useState("");
+  const [creatingVersion, setCreatingVersion] = useState(false);
+  const [versionError, setVersionError] = useState<string | null>(null);
+
+  const handleCreateVersion = async () => {
+    if (!release || !newVersionInput.trim()) return;
+    setCreatingVersion(true);
+    setVersionError(null);
+    try {
+      const { createVersion } = await import("../api");
+      const res = await createVersion(release.id, newVersionInput.trim());
+      window.location.href = `/releases/${res.id}`;
+    } catch (err) {
+      setVersionError(err instanceof Error ? err.message : "Failed to create version");
+      setCreatingVersion(false);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -100,12 +141,10 @@ export default function ReleaseDetail() {
             )}
             {release.status === "FINAL" && (
               <button
-                onClick={async () => {
-                  const newVer = prompt("Enter new version number (e.g. 1.1.0)");
-                  if (newVer) {
-                    const { createVersion } = await import("../api");
-                    createVersion(release.id, newVer).then(res => window.location.href = `/releases/${res.id}`).catch(err => alert(err.message));
-                  }
+                onClick={() => {
+                  setVersionModalOpen(true);
+                  setNewVersionInput("");
+                  setVersionError(null);
                 }}
                 className="px-4 py-1.5 bg-surface-800 hover:bg-surface-700 text-white text-sm font-medium rounded-lg transition-colors border border-surface-700"
               >
@@ -214,30 +253,110 @@ export default function ReleaseDetail() {
             <p className="text-surface-500 text-sm">No items in this release.</p>
           ) : (
             <div className="space-y-3">
-              {release.items.map((item) => (
-                <div key={item.id} className="bg-surface-900/50 border border-surface-800 rounded-xl p-5">
-                  <div className="flex items-start gap-3">
-                    <span className="text-xs font-mono text-surface-400 bg-surface-800 px-2 py-0.5 rounded shrink-0">
-                      {item.displayId}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${TYPE_COLORS[item.itemType] || "bg-surface-700 text-surface-300"}`}>
-                          {item.itemType.replace(/_/g, " ")}
-                        </span>
+              {release.items.map((item) => {
+                const mismatch = hasNumberMismatch(item.title, item.content);
+                return (
+                  <div key={item.id} className="bg-surface-900/50 border border-surface-800 rounded-xl p-5">
+                    <div className="flex items-start gap-3">
+                      <span className="text-xs font-mono text-surface-400 bg-surface-800 px-2 py-0.5 rounded shrink-0">
+                        {item.displayId}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${TYPE_COLORS[item.itemType] || "bg-surface-700 text-surface-300"}`}>
+                            {item.itemType.replace(/_/g, " ")}
+                          </span>
+                          {mismatch && (
+                            <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded border bg-amber-500/10 text-amber-400 border-amber-500/30">
+                              ⚠ Number Mismatch
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="text-white font-medium">{item.title}</h3>
+                        {mismatch && (
+                          <p className="text-amber-400/80 text-xs mt-1 font-medium">
+                            Warning: The numbers in the title and content do not match.
+                          </p>
+                        )}
+                        <p className="text-surface-400 text-sm mt-1 whitespace-pre-wrap">{item.content}</p>
+                        <p className="text-surface-600 text-xs mt-2 font-mono truncate" title={item.contentHash}>
+                          Hash: {item.contentHash.substring(0, 16)}…
+                        </p>
                       </div>
-                      <h3 className="text-white font-medium">{item.title}</h3>
-                      <p className="text-surface-400 text-sm mt-1 whitespace-pre-wrap">{item.content}</p>
-                      <p className="text-surface-600 text-xs mt-2 font-mono truncate" title={item.contentHash}>
-                        Hash: {item.contentHash.substring(0, 16)}…
-                      </p>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
+
+        {/* Create Version Modal */}
+        {versionModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <div 
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => !creatingVersion && setVersionModalOpen(false)}
+            />
+            
+            {/* Modal Content */}
+            <div className="relative bg-surface-900 border border-surface-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-[fadeIn_0.2s_ease-out]">
+              <div className="p-6 space-y-4">
+                <div>
+                  <h3 className="text-xl font-semibold text-white">Create New Version</h3>
+                  <p className="text-sm text-surface-400 mt-1">
+                    Clone this release into a new version to continue working.
+                  </p>
+                </div>
+                
+                <div>
+                  <label htmlFor="newVersion" className="block text-sm font-medium text-surface-300 mb-1.5">
+                    New Version Number
+                  </label>
+                  <input
+                    id="newVersion"
+                    type="text"
+                    required
+                    placeholder="e.g. 1.1.0"
+                    value={newVersionInput}
+                    onChange={(e) => setNewVersionInput(e.target.value)}
+                    className="w-full bg-surface-800 border border-surface-600 rounded-lg px-3 py-2 text-white placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all"
+                    autoFocus
+                  />
+                </div>
+
+                {versionError && (
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-red-400 text-sm">
+                    {versionError}
+                  </div>
+                )}
+              </div>
+              
+              <div className="border-t border-surface-800 bg-surface-900/50 p-4 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setVersionModalOpen(false)}
+                  disabled={creatingVersion}
+                  className="px-4 py-2 text-sm font-medium text-surface-300 hover:text-white bg-surface-800 hover:bg-surface-700 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateVersion}
+                  disabled={creatingVersion || !newVersionInput.trim()}
+                  className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-500 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-primary-600/20"
+                >
+                  {creatingVersion && (
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {creatingVersion ? "Creating..." : "Create Version"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

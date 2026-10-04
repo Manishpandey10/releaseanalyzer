@@ -1,5 +1,6 @@
 import prisma from "../lib/prisma.js";
 import { hashReleaseItemContent } from "../domain/hash.js";
+import { formatDisplayId } from "../domain/displayId.js";
 import { ReviewStatus } from "@prisma/client";
 
 export async function approveStatement(id: string, statementId: string) {
@@ -56,11 +57,6 @@ export async function updateStatementContent(id: string, statementId: string, co
     }
   }
 
-  const formatDisplayId = (itemType: string, sortOrder: number) => {
-    const prefix = itemType.split("_").map(w => w[0]).join("");
-    return `${prefix}-${sortOrder.toString().padStart(3, "0")}`;
-  };
-
   const currentDisplayIds = statement.evidence.map(ev => formatDisplayId(ev.releaseItem.itemType, ev.releaseItem.sortOrder));
 
   return await prisma.generatedStatement.update({
@@ -69,6 +65,7 @@ export async function updateStatementContent(id: string, statementId: string, co
       statement: content,
       reviewStatus: finalStatus,
       isStale: isNowStale,
+      isEdited: true, // Only human edits set this to true
       ...(statement.isStale ? {
         originalEvidenceCount: statement.evidence.length,
         originalEvidenceDisplayIds: currentDisplayIds
@@ -133,29 +130,28 @@ export async function getStatementsByRelease(releaseId: string) {
     orderBy: { createdAt: 'asc' }
   });
 
-  const formatDisplayId = (itemType: string, sortOrder: number) => {
-    const prefix = itemType.split("_").map(w => w[0]).join("");
-    return `${prefix}-${sortOrder.toString().padStart(3, "0")}`;
-  };
-
   return stmts.map(stmt => {
     const reasons: { displayId: string; reason: string }[] = [];
     if (stmt.isStale) {
-      const citedDisplayIds = stmt.evidence.map(ev => formatDisplayId(ev.releaseItem.itemType, ev.releaseItem.sortOrder));
-      
+      const citedDisplayIds = stmt.originalEvidenceDisplayIds || [];
+      const currentEvDisplayIds = new Set<string>();
+
       for (const ev of stmt.evidence) {
+        const dId = formatDisplayId(ev.releaseItem.itemType, ev.releaseItem.sortOrder);
+        currentEvDisplayIds.add(dId);
+
         if (ev.sourceHashAtGeneration !== ev.releaseItem.contentHash) {
-          const dId = formatDisplayId(ev.releaseItem.itemType, ev.releaseItem.sortOrder);
           reasons.push({ displayId: dId, reason: "CHANGED" });
         }
       }
-      
-      const missingIds = stmt.originalEvidenceDisplayIds.filter(id => !citedDisplayIds.includes(id));
-      for (const dId of missingIds) {
-        reasons.push({ displayId: dId, reason: "REMOVED" });
+
+      for (const dId of citedDisplayIds) {
+        if (!currentEvDisplayIds.has(dId)) {
+          reasons.push({ displayId: dId, reason: "REMOVED" });
+        }
       }
-      const totalMissing = stmt.originalEvidenceCount - stmt.evidence.length;
-      const unknownCount = Math.max(0, totalMissing - missingIds.length);
+
+      const unknownCount = Math.max(0, stmt.originalEvidenceCount - (currentEvDisplayIds.size + reasons.filter(r => r.reason === "REMOVED").length));
       for (let i = 0; i < unknownCount; i++) {
         reasons.push({ displayId: "Unknown", reason: "REMOVED" });
       }

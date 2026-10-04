@@ -272,6 +272,7 @@ export async function createVersion(originalId: string, newVersionStr: string) {
           supportStatus: stmt.supportStatus,
           reviewStatus: stmt.reviewStatus, // keep review status since content hasn't changed yet
           isStale: stmt.isStale,
+          isEdited: stmt.isEdited,
           originalEvidenceCount: stmt.originalEvidenceCount,
           originalEvidenceDisplayIds: stmt.originalEvidenceDisplayIds,
         }
@@ -344,49 +345,34 @@ export async function compareVersions(id1: string, id2: string) {
     include: { evidence: { include: { releaseItem: true } } }
   });
 
-  const formatDisplayId = (itemType: string, sortOrder: number) => {
-    const prefix = itemType.split("_").map(w => w[0]).join("");
-    return `${prefix}-${sortOrder.toString().padStart(3, "0")}`;
-  };
-
   const staleStatements = targetStatements.map(stmt => {
-    const baseStmt = baseStatements.find(s => s.statement === stmt.statement);
-    const citedDisplayIds: string[] = [];
+    const citedDisplayIds = stmt.originalEvidenceDisplayIds || [];
     const reasons: { displayId: string; reason: string }[] = [];
 
-    if (baseStmt) {
-      for (const ev of baseStmt.evidence) {
-        const dId = formatDisplayId(ev.releaseItem.itemType, ev.releaseItem.sortOrder);
-        citedDisplayIds.push(dId);
+    // Determine current valid display IDs from evidence links
+    const currentEvDisplayIds = new Set<string>();
+    
+    for (const ev of stmt.evidence) {
+      const dId = formatDisplayId(ev.releaseItem.itemType, ev.releaseItem.sortOrder);
+      currentEvDisplayIds.add(dId);
 
-        const i2 = map2.get(dId);
-        if (!i2) {
-          reasons.push({ displayId: dId, reason: "REMOVED" });
-        } else {
-          const targetEv = stmt.evidence.find(te => te.releaseItemId === i2.id);
-          if (targetEv && targetEv.sourceHashAtGeneration !== i2.contentHash) {
-            reasons.push({ displayId: dId, reason: "CHANGED" });
-          }
-        }
+      // CHANGED: the item is still linked, but its hash differs from generation time
+      if (ev.sourceHashAtGeneration !== ev.releaseItem.contentHash) {
+        reasons.push({ displayId: dId, reason: "CHANGED" });
       }
-    } else {
-      // Fallback if base statement not found
-      for (const ev of stmt.evidence) {
-        const dId = formatDisplayId(ev.releaseItem.itemType, ev.releaseItem.sortOrder);
-        citedDisplayIds.push(dId);
-        if (ev.sourceHashAtGeneration !== ev.releaseItem.contentHash) {
-          reasons.push({ displayId: dId, reason: "CHANGED" });
-        }
-      }
-      const missingIds = stmt.originalEvidenceDisplayIds.filter(id => !citedDisplayIds.includes(id));
-      for (const dId of missingIds) {
+    }
+
+    // REMOVED: it was in originalEvidenceDisplayIds, but is no longer in current evidence links
+    for (const dId of citedDisplayIds) {
+      if (!currentEvDisplayIds.has(dId)) {
         reasons.push({ displayId: dId, reason: "REMOVED" });
       }
-      const totalMissing = stmt.originalEvidenceCount - stmt.evidence.length;
-      const unknownCount = Math.max(0, totalMissing - missingIds.length);
-      for (let i = 0; i < unknownCount; i++) {
-        reasons.push({ displayId: "Unknown", reason: "REMOVED" });
-      }
+    }
+
+    // Fallback if there was a length mismatch not covered by the display IDs array (e.g. old data)
+    const unknownCount = Math.max(0, stmt.originalEvidenceCount - (currentEvDisplayIds.size + reasons.filter(r => r.reason === "REMOVED").length));
+    for (let i = 0; i < unknownCount; i++) {
+      reasons.push({ displayId: "Unknown", reason: "REMOVED" });
     }
 
     return {

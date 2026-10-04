@@ -270,6 +270,9 @@ export default function EditRelease() {
                           className={`${inputClass} resize-y`}
                         />
                       </div>
+                      <p className="text-[11px] text-surface-500 mt-1 pl-1">
+                        Hint: Title is a short label. Content is the full statement and is what the AI reads.
+                      </p>
                     </div>
                   )}
                 </div>

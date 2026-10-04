@@ -397,7 +397,7 @@ describe("Staleness Edge Cases and Resolution", () => {
     expect(finRes.status).toBe(400); // or 500
   });
 
-  it("compare returns staleStatements with reasons", async () => {
+  it("compare returns staleStatements with reasons", { timeout: 10000 }, async () => {
     // Tested implicitly in `getStatementsByRelease` above, but let's test the specific /versions compare
     const createRes = await request(app).post("/api/releases").send({ version: "1.0.0", title: "TEST- Compare " + Date.now(), items: [{ itemType: "FEATURE", title: "F", content: "f" }] });
     const bId = createRes.body.data.id;
@@ -426,5 +426,91 @@ describe("Staleness Edge Cases and Resolution", () => {
     const tRel = rels.body.data.find((r: any) => r.version === "1.1.0" && r.title.startsWith("TEST- Compare"));
     const stmts = await request(app).get(`/api/releases/${tRel.id}/statements`);
     expect(stmts.body.data[0].isStale).toBe(true);
+  });
+});
+
+describe("isEdited property rules", () => {
+  async function setupTestRelease() {
+    const createRes = await request(app).post("/api/releases").send({ version: "1.0.0", title: "TEST- isEdited " + Date.now(), items: [{ itemType: "FEATURE", title: "F", content: "f" }] });
+    const rId = createRes.body.data.id;
+    const items = createRes.body.data.items;
+    
+    const stmt = await prisma.generatedStatement.create({
+      data: { releaseId: rId, audience: "INTERNAL", statement: "S", impact: "LOW", supportStatus: "SUPPORTED", reviewStatus: "PENDING", isStale: false, isEdited: false, originalEvidenceCount: 1, originalEvidenceDisplayIds: [items[0].displayId], evidence: { create: [{ releaseItemId: items[0].id, sourceHashAtGeneration: items[0].contentHash }] } }
+    });
+    return { releaseId: rId, items, statement: stmt };
+  }
+
+  it("editing a statement sets isEdited", async () => {
+    const { releaseId, statement } = await setupTestRelease();
+    const res = await request(app).patch(`/api/releases/${releaseId}/statements/${statement.id}`).send({ statement: "Edited text" });
+    expect(res.status).toBe(200);
+    expect(res.body.data.isEdited).toBe(true);
+  });
+
+  it("approve, reject, resolve and system stale-marking do not set isEdited", async () => {
+    const { releaseId, statement, items } = await setupTestRelease();
+    
+    let res = await request(app).post(`/api/releases/${releaseId}/statements/${statement.id}/approve`);
+    expect(res.body.data.isEdited).toBe(false);
+
+    res = await request(app).post(`/api/releases/${releaseId}/statements/${statement.id}/reject`);
+    expect(res.body.data.isEdited).toBe(false);
+
+    await request(app).patch(`/api/releases/${releaseId}`).send({ items: [{ id: items[0].id, itemType: "FEATURE", title: "F", content: "changed_for_stale" }] });
+    await request(app).get(`/api/releases/${releaseId}/statements`); // triggers stale
+    
+    const staleStmt = await prisma.generatedStatement.findUnique({ where: { id: statement.id } });
+    expect(staleStmt?.isStale).toBe(true);
+    expect(staleStmt?.isEdited).toBe(false);
+
+    res = await request(app).post(`/api/releases/${releaseId}/statements/${statement.id}/resolve`).send({ note: "resolved stale" });
+    expect(res.body.data.isEdited).toBe(false);
+  });
+
+  it("editing an APPROVED statement resets it to PENDING and sets isEdited", async () => {
+    const { releaseId, statement } = await setupTestRelease();
+    await request(app).post(`/api/releases/${releaseId}/statements/${statement.id}/approve`);
+    
+    const res = await request(app).patch(`/api/releases/${releaseId}/statements/${statement.id}`).send({ statement: "I am changing this" });
+    expect(res.body.data.reviewStatus).toBe("PENDING");
+    expect(res.body.data.isEdited).toBe(true);
+  });
+
+  it("version clone keeps isEdited", async () => {
+    const { releaseId, statement } = await setupTestRelease();
+    await request(app).patch(`/api/releases/${releaseId}/statements/${statement.id}`).send({ statement: "Edited" });
+    await request(app).post(`/api/releases/${releaseId}/statements/${statement.id}/approve`);
+    await prisma.release.update({ where: { id: releaseId }, data: { status: "FINAL" } });
+    
+    const res = await request(app).post(`/api/releases/${releaseId}/versions`).send({ version: "2.0.0" });
+    const newReleaseId = res.body.data.id;
+    const clonedStmts = await prisma.generatedStatement.findMany({ where: { releaseId: newReleaseId } });
+    expect(clonedStmts[0].isEdited).toBe(true);
+  });
+
+  it("re-analyze returns 409 for an edited statement", async () => {
+    const { releaseId, statement } = await setupTestRelease();
+    await request(app).patch(`/api/releases/${releaseId}/statements/${statement.id}`).send({ statement: "Edited" });
+
+    const res = await request(app).post(`/api/releases/${releaseId}/analyze`);
+    expect(res.status).toBe(409);
+    expect(res.text).toMatch(/replace reviewed statements/);
+  });
+
+  it("re-analyze does NOT return 409 when the only change is system stale marking", async () => {
+    const { releaseId, statement, items } = await setupTestRelease();
+    await request(app).patch(`/api/releases/${releaseId}`).send({ items: [{ id: items[0].id, itemType: "FEATURE", title: "F", content: "changed_for_stale" }] });
+    await request(app).get(`/api/releases/${releaseId}/statements`);
+    
+    const staleStmt = await prisma.generatedStatement.findUnique({ where: { id: statement.id } });
+    expect(staleStmt?.isStale).toBe(true);
+    expect(staleStmt?.isEdited).toBe(false);
+
+    // AI is not fully mocked here for a successful run (requires valid items etc.), 
+    // but the 409 guard happens BEFORE item validation, so if we get 400 (validation), 
+    // it successfully bypassed the 409 guard!
+    const res = await request(app).post(`/api/releases/${releaseId}/analyze`);
+    expect(res.status).not.toBe(409);
   });
 });

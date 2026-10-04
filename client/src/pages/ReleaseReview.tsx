@@ -120,6 +120,11 @@ export default function ReleaseReview() {
                   ⚠ STALE
                 </span>
               )}
+              {stmt.isEdited && (
+                <span className="text-[10px] px-2 py-0.5 rounded uppercase font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                  EDITED
+                </span>
+              )}
               <span className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${REVIEW_COLORS[stmt.reviewStatus]}`}>
                 {stmt.reviewStatus}
               </span>

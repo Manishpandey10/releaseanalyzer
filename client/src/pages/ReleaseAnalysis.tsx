@@ -14,6 +14,11 @@ const SUPPORT_COLORS: Record<string, string> = {
   UNSUPPORTED: "text-red-400 bg-red-500/10 border-red-500/30",
 };
 
+const RISK_KIND_COLORS: Record<string, string> = {
+  KNOWN_LIMITATION: "text-orange-400 bg-orange-500/10 border-orange-500/30",
+  INFERRED_RISK: "text-red-400 bg-red-500/10 border-red-500/30",
+};
+
 export default function ReleaseAnalysis() {
   const { id } = useParams<{ id: string }>();
   const [release, setRelease] = useState<Release | null>(null);
@@ -252,17 +257,26 @@ export default function ReleaseAnalysis() {
               ) : (
                 <div className="grid gap-3">
                   {analysis.resultJson.risks?.map((item: any, i: number) => (
-                    <div key={i} className="bg-surface-900/40 border border-surface-800 rounded-xl p-4 flex items-start justify-between gap-4">
-                      <div>
-                        <span className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold border mb-2 inline-block ${IMPACT_COLORS[item.severity] || IMPACT_COLORS.MEDIUM}`}>
-                          {item.severity} SEVERITY
-                        </span>
-                        <p className="text-surface-300 text-sm leading-relaxed">{item.description}</p>
-                      </div>
-                      <div className="shrink-0 flex gap-1">
-                        {item.evidenceIds?.map((e: string) => (
-                          <span key={e} className="text-[10px] font-mono bg-surface-800 text-surface-400 px-1.5 py-0.5 rounded">[{e}]</span>
-                        ))}
+                    <div key={i} className="bg-surface-900/40 border border-surface-800 rounded-xl p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold border ${IMPACT_COLORS[item.severity] || IMPACT_COLORS.MEDIUM}`}>
+                              {item.severity} SEVERITY
+                            </span>
+                            {item.kind && (
+                              <span className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold border ${RISK_KIND_COLORS[item.kind] || RISK_KIND_COLORS.INFERRED_RISK}`}>
+                                {item.kind === "KNOWN_LIMITATION" ? "Known Limitation" : "Inferred Risk"}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-surface-300 text-sm leading-relaxed">{item.description}</p>
+                        </div>
+                        <div className="shrink-0 flex gap-1">
+                          {item.evidenceIds?.map((e: string) => (
+                            <span key={e} className="text-[10px] font-mono bg-surface-800 text-surface-400 px-1.5 py-0.5 rounded">[{e}]</span>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -277,17 +291,32 @@ export default function ReleaseAnalysis() {
                 Internal Technical Summary
               </h2>
               <div className="space-y-2">
-                {analysis.resultJson.internalStatements?.map((item: any, i: number) => (
-                  <div key={i} className="flex items-start gap-3 p-3 bg-surface-900/20 rounded-lg hover:bg-surface-900/40 transition-colors">
-                    <span className="text-surface-500 mt-0.5">•</span>
-                    <p className="text-surface-200 text-sm flex-1 leading-relaxed">{item.statement}</p>
-                    <div className="shrink-0 flex flex-wrap gap-1 w-24 justify-end">
-                      {item.evidenceIds?.map((e: string) => (
-                        <span key={e} className="text-[10px] font-mono text-surface-500 hover:text-surface-300 transition-colors cursor-pointer">[{e}]</span>
-                      ))}
+                {analysis.resultJson.internalStatements?.map((item: any, i: number) => {
+                  const downgrade = analysis.resultJson.coverageWarnings?.find(
+                    (w: any) => w.kind === "SUPPORT_DOWNGRADE" && w.statementText === item.statement
+                  );
+                  return (
+                    <div key={i} className="p-3 bg-surface-900/20 rounded-lg hover:bg-surface-900/40 transition-colors space-y-1.5">
+                      <div className="flex items-start gap-3">
+                        <span className="text-surface-500 mt-0.5">•</span>
+                        <p className="text-surface-200 text-sm flex-1 leading-relaxed">{item.statement}</p>
+                        <div className="shrink-0 flex flex-col gap-1 items-end">
+                          {item.supportStatus && (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded border font-bold uppercase ${SUPPORT_COLORS[item.supportStatus] || SUPPORT_COLORS.UNSUPPORTED}`}>
+                              {item.supportStatus.replace("_", " ")}
+                            </span>
+                          )}
+                          {item.evidenceIds?.map((e: string) => (
+                            <span key={e} className="text-[10px] font-mono text-surface-500 hover:text-surface-300 transition-colors cursor-pointer">[{e}]</span>
+                          ))}
+                        </div>
+                      </div>
+                      {downgrade && (
+                        <p className="text-amber-400 text-[11px] pl-5">⚠ Unverified: {downgrade.reason}</p>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
 
@@ -298,17 +327,32 @@ export default function ReleaseAnalysis() {
                 Client / Stakeholder Summary
               </h2>
               <div className="space-y-2">
-                {analysis.resultJson.clientStatements?.map((item: any, i: number) => (
-                  <div key={i} className="flex items-start gap-3 p-3 bg-surface-900/20 rounded-lg hover:bg-surface-900/40 transition-colors">
-                    <span className="text-surface-500 mt-0.5">•</span>
-                    <p className="text-surface-200 text-sm flex-1 leading-relaxed">{item.statement}</p>
-                    <div className="shrink-0 flex flex-wrap gap-1 w-24 justify-end">
-                      {item.evidenceIds?.map((e: string) => (
-                        <span key={e} className="text-[10px] font-mono text-surface-500 hover:text-surface-300 transition-colors cursor-pointer">[{e}]</span>
-                      ))}
+                {analysis.resultJson.clientStatements?.map((item: any, i: number) => {
+                  const downgrade = analysis.resultJson.coverageWarnings?.find(
+                    (w: any) => w.kind === "SUPPORT_DOWNGRADE" && w.statementText === item.statement
+                  );
+                  return (
+                    <div key={i} className="p-3 bg-surface-900/20 rounded-lg hover:bg-surface-900/40 transition-colors space-y-1.5">
+                      <div className="flex items-start gap-3">
+                        <span className="text-surface-500 mt-0.5">•</span>
+                        <p className="text-surface-200 text-sm flex-1 leading-relaxed">{item.statement}</p>
+                        <div className="shrink-0 flex flex-col gap-1 items-end">
+                          {item.supportStatus && (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded border font-bold uppercase ${SUPPORT_COLORS[item.supportStatus] || SUPPORT_COLORS.UNSUPPORTED}`}>
+                              {item.supportStatus.replace("_", " ")}
+                            </span>
+                          )}
+                          {item.evidenceIds?.map((e: string) => (
+                            <span key={e} className="text-[10px] font-mono text-surface-500 hover:text-surface-300 transition-colors cursor-pointer">[{e}]</span>
+                          ))}
+                        </div>
+                      </div>
+                      {downgrade && (
+                        <p className="text-amber-400 text-[11px] pl-5">⚠ Unverified: {downgrade.reason}</p>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
 
@@ -330,6 +374,35 @@ export default function ReleaseAnalysis() {
                 </ul>
               )}
             </section>
+
+            {/* Coverage Warnings */}
+            {analysis.resultJson.coverageWarnings?.length > 0 && (
+              <section className="space-y-4">
+                <h2 className="text-lg font-medium text-white flex items-center gap-2">
+                  <span className="w-1.5 h-6 bg-amber-600 rounded-full"></span>
+                  Coverage Warnings
+                </h2>
+                <div className="grid gap-2">
+                  {analysis.resultJson.coverageWarnings.map((w: any, i: number) => (
+                    <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${
+                      w.kind === "SUPPORT_DOWNGRADE"
+                        ? "bg-amber-500/5 border-amber-500/20 text-amber-300"
+                        : "bg-surface-900/40 border-surface-700 text-surface-400"
+                    }`}>
+                      <span className="shrink-0">{w.kind === "SUPPORT_DOWNGRADE" ? "↓" : "⚠"}</span>
+                      <div>
+                        {w.kind === "SUPPORT_DOWNGRADE" && (
+                          <p className="font-medium text-amber-200 text-xs mb-0.5">
+                            Status downgraded: {w.oldStatus} → {w.newStatus}
+                          </p>
+                        )}
+                        <p>{w.reason}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         )}
       </main>

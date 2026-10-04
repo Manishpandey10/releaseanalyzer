@@ -169,6 +169,7 @@ export interface Statement {
   supportStatus: "SUPPORTED" | "PARTIALLY_SUPPORTED" | "UNSUPPORTED";
   reviewStatus: "PENDING" | "APPROVED" | "REJECTED";
   isStale: boolean;
+  isEdited: boolean;
   evidence: { releaseItem: ReleaseItem }[];
   reasons?: { displayId: string; reason: string }[];
 }
