@@ -3,7 +3,7 @@ services:
     name: releaseanalyst-server
     env: node
     rootDir: server
-    buildCommand: npm install && npm run db:generate && npx prisma migrate deploy && npm run build
+    buildCommand: npm install --include=dev && npm run db:generate && npx prisma migrate deploy && npm run build
     startCommand: npm run start
     envVars:
       - key: PORT
@@ -22,7 +22,7 @@ services:
     name: releaseanalyst-client
     env: static
     rootDir: client
-    buildCommand: npm install && npm run build
+    buildCommand: npm install --include=dev && npm run build
     staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
