@@ -79,7 +79,7 @@ export default function WhatsNext({
     title = "Release finalized";
     description = "This release has completed the review and finalization process.";
     actionLabel = "View Final Brief";
-    actionLink = `/releases/${releaseId}`;
+    actionLink = `/releases/${releaseId}/final`;
     // We cannot use a simple Link for creating a new version as it requires a modal/API call.
     // We'll just emit an event or let the parent handle the "Create New Version" via the header for now, 
     // or add a link to the detail page which HAS the modal.

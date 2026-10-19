@@ -2,3 +2,8 @@ node_modules/
 dist/
 .env
 *.log
+tmp
+output
+build_interactive_pdf.py
+docs/ReleaseAnalyst_Project_Guide.docx
+build_project_guide.ps1
